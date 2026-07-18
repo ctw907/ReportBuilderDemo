@@ -59,13 +59,13 @@
     background: linear-gradient(180deg, #ffffff, #fbfcfe);
     border-bottom: 1px solid var(--line);
   }
-  .chat__avatar {
-    width: 38px; height: 38px;
-    border-radius: 11px;
-    background: linear-gradient(135deg, var(--brand), #7aa4ff);
-    display: grid; place-items: center;
-    color: #fff; font-weight: 700; font-size: 16px;
+  .chat__logo {
+    height: 40px;
+    width: auto;
+    max-width: 150px;
+    object-fit: contain;
     flex: none;
+    display: block;
   }
   .chat__title { font-weight: 650; font-size: 15px; line-height: 1.1; }
   .chat__subtitle { font-size: 12px; color: var(--ink-soft); margin-top: 2px; display:flex; align-items:center; gap:6px;}
@@ -182,10 +182,13 @@
 <body>
   <div class="chat" role="log" aria-live="polite">
     <div class="chat__header">
-      <div class="chat__avatar">R</div>
+      <img class="chat__logo"
+           src="https://img1.wsimg.com/isteam/ip/13a3286d-c16f-45d3-b860-bf992e4c1238/Custom%20Trade%20Workflows.png"
+           alt="Custom Trade Workflows"
+           onerror="this.style.display='none'" />
       <div>
         <div class="chat__title">Report Assistant</div>
-        <div class="chat__subtitle"><span class="dot"></span> Ask for a report in plain English</div>
+        <div class="chat__subtitle"><span class="dot"></span> Ask in plain English</div>
       </div>
     </div>
 
@@ -193,12 +196,12 @@
 
     <div class="chat__composer">
       <textarea id="input" class="chat__input" rows="1"
-        placeholder="e.g. show me James Ferrell's active jobs"></textarea>
+        placeholder="e.g. show me Mick Jagger's active jobs"></textarea>
       <button id="send" class="chat__send" aria-label="Send">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
       </button>
     </div>
-    <div class="hint">Powered by Power Automate + Claude</div>
+    <div class="hint"><a href="https://customtradeworkflows.com" target="_blank" rel="noopener" style="color:var(--ink-soft);text-decoration:none;">customtradeworkflows.com</a></div>
   </div>
 
 <script>
@@ -210,7 +213,7 @@
 const CONFIG = {
   flowUrl:   "https://defaultff6ba2824f544b34b3ee2dfa83ff71.b2.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/31/workflows/58d6433bbe3a4d3dbcd896627c8b736a/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=sZ2B7DcdNSfCCfjr0UiekvDmp1B9Mbla3xAktcBMvLA",
   requester: "josh.thomas@customtradeworkflows.com", // shown to the flow; use logged-in user in production
-  greeting:  "Hi! Tell me what you'd like to see and I'll pull a live report. For example: “show me James Ferrell’s active jobs”."
+  greeting:  "Hi! Tell me what you'd like to see and I'll pull it live. For example: “show me Mick Jagger’s active jobs”."
 };
 
 const logEl   = document.getElementById("log");
@@ -220,6 +223,18 @@ const sendEl   = document.getElementById("send");
 // A simple id so the flow could thread a conversation if desired (no crypto needed for a demo).
 let conversationId = "web-" + Date.now().toString(36) + "-" + Math.floor(performance.now()).toString(36);
 let busy = false;
+
+// Running transcript of the whole conversation. The FULL history is sent on every
+// turn (as `transcript`) so the flow's Claude calls have complete context, not just
+// the latest line. `message` still carries just the newest request for anything
+// that wants it. Tokens are not a concern here.
+const conversation = [];
+
+function buildTranscript() {
+  return conversation
+    .map(m => (m.role === "user" ? "User: " : "Assistant: ") + m.content)
+    .join("\n");
+}
 
 function addMessage(role, text, opts = {}) {
   const wrap = document.createElement("div");
@@ -276,10 +291,13 @@ async function send() {
   }
 
   addMessage("user", text);
+  conversation.push({ role: "user", content: text });   // record before sending
   inputEl.value = "";
   inputEl.style.height = "auto";
   setBusy(true);
   showTyping();
+
+  const transcript = buildTranscript();   // whole conversation incl. this turn
 
   try {
     const res = await fetch(CONFIG.flowUrl, {
@@ -288,7 +306,10 @@ async function send() {
       // which the Power Automate trigger cannot answer. The body is still JSON.
       headers: { "Content-Type": "text/plain;charset=UTF-8" },
       body: JSON.stringify({
-        message: text,
+        message: transcript,       // full transcript so the flow's Claude sees all context
+        latest: text,              // just the newest request, if the flow wants it
+        transcript: transcript,    // explicit copy for clarity / future use
+        turns: conversation,       // structured [{role, content}, ...] history
         requester: CONFIG.requester,
         conversationId: conversationId
       })
@@ -307,13 +328,19 @@ async function send() {
     try { data = JSON.parse(raw); } catch { data = { status: "ok", reply: raw }; }
 
     const status = (data.status || "ok").toLowerCase();
+    let botReply;
     if (status === "needs_clarification" || status === "clarify") {
-      addMessage("bot", data.clarification || data.reply || "Could you give me a bit more detail?", { statusTag: "warn" });
+      botReply = data.clarification || data.reply || "Could you give me a bit more detail?";
+      addMessage("bot", botReply, { statusTag: "warn" });
     } else if (status === "error") {
-      addMessage("bot", data.reply || data.error || "Sorry, I couldn't build that report.", { statusTag: "err" });
+      botReply = data.reply || data.error || "Sorry, I couldn't build that report.";
+      addMessage("bot", botReply, { statusTag: "err" });
     } else {
-      addMessage("bot", data.reply || "Here's your report.", { link: data.link || data.url });
+      botReply = data.reply || "Here's your report.";
+      addMessage("bot", botReply, { link: data.link || data.url });
     }
+    // record the assistant turn so it's part of the next request's context
+    conversation.push({ role: "assistant", content: botReply });
   } catch (err) {
     hideTyping();
     // A thrown TypeError here is almost always CORS or network. See the setup guide.
@@ -339,7 +366,7 @@ inputEl.addEventListener("input", () => {
 });
 sendEl.addEventListener("click", send);
 
-// Greeting
+// Greeting (not sent to the flow — just shown to the user)
 addMessage("bot", CONFIG.greeting);
 inputEl.focus();
 </script>
