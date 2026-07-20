@@ -1,0 +1,272 @@
+<title>Report — Custom Trade Workflows</title>
+<style>
+  :root{
+    --paper:#F4F7FB; --surface:#FFFFFF; --surface-2:#FBFCFE;
+    --ink:#0E1826; --ink-2:#44536B; --ink-3:#7C8AA3;
+    --line:#E4EAF3; --line-2:#EDF1F8;
+    --brand:#2F6DF6; --brand-deep:#1B4DB3; --brand-wash:#EAF1FE;
+    --active:#16A34A; --hold:#E0A100; --bid:#8B5CF6; --done:#64748B; --other:#2F6DF6;
+    --over:#DC2626; --under:#16A34A;
+    --shadow:0 1px 2px rgba(14,24,38,.04), 0 12px 32px -12px rgba(14,24,38,.14);
+    --radius:14px;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){:root{
+    --paper:#0A101C; --surface:#101B2C; --surface-2:#0D1726; --ink:#EAF1FB; --ink-2:#9DACC6; --ink-3:#66768F;
+    --line:#1E2B41; --line-2:#182338; --brand:#5B8DEF; --brand-deep:#2F6DF6; --brand-wash:#152238;
+    --active:#2BBE6C; --hold:#EBB13C; --bid:#A78BFA; --done:#7C8AA3; --other:#5B8DEF; --over:#F26B6B; --under:#2BBE6C;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 18px 40px -16px rgba(0,0,0,.55);
+  }}
+  :root[data-theme="light"]{--paper:#F4F7FB;--surface:#FFFFFF;--surface-2:#FBFCFE;--ink:#0E1826;--ink-2:#44536B;--ink-3:#7C8AA3;--line:#E4EAF3;--line-2:#EDF1F8;--brand:#2F6DF6;--brand-deep:#1B4DB3;--brand-wash:#EAF1FE;--active:#16A34A;--hold:#E0A100;--bid:#8B5CF6;--done:#64748B;--other:#2F6DF6;--over:#DC2626;--under:#16A34A;--shadow:0 1px 2px rgba(14,24,38,.04), 0 12px 32px -12px rgba(14,24,38,.14);}
+  :root[data-theme="dark"]{--paper:#0A101C;--surface:#101B2C;--surface-2:#0D1726;--ink:#EAF1FB;--ink-2:#9DACC6;--ink-3:#66768F;--line:#1E2B41;--line-2:#182338;--brand:#5B8DEF;--brand-deep:#2F6DF6;--brand-wash:#152238;--active:#2BBE6C;--hold:#EBB13C;--bid:#A78BFA;--done:#7C8AA3;--other:#5B8DEF;--over:#F26B6B;--under:#2BBE6C;--shadow:0 1px 2px rgba(0,0,0,.3), 0 18px 40px -16px rgba(0,0,0,.55);}
+
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--paper); color:var(--ink); font-family:var(--sans); font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased; padding:32px 20px 64px}
+  .wrap{max-width:980px; margin:0 auto} .mono{font-family:var(--mono)} .tnum{font-variant-numeric:tabular-nums}
+  .toolbar{max-width:980px; margin:0 auto 18px; display:flex; justify-content:flex-end; gap:8px}
+  .tbtn{display:inline-flex; align-items:center; gap:7px; height:36px; padding:0 13px; border:1px solid var(--line); background:var(--surface); color:var(--ink-2); border-radius:10px; font:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:border-color .15s,color .15s}
+  .tbtn:hover{border-color:var(--brand); color:var(--brand)} .tbtn:focus-visible{outline:2px solid var(--brand); outline-offset:2px} .tbtn svg{width:16px;height:16px}
+  .head{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:26px 28px; position:relative; overflow:hidden}
+  .head::before{content:""; position:absolute; inset:0 auto 0 0; width:4px; background:linear-gradient(180deg,var(--brand),var(--bid))}
+  .eyebrow{font-family:var(--mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3); display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .eyebrow b{color:var(--brand); font-weight:600}
+  .name{font-size:36px; font-weight:800; letter-spacing:-.02em; margin:10px 0 4px; text-wrap:balance; line-height:1.06}
+  .role{color:var(--ink-2); font-size:14.5px; max-width:70ch}
+  .chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:16px}
+  .chip{font-family:var(--mono); font-size:12px; padding:5px 10px; border-radius:999px; background:var(--brand-wash); color:var(--brand-deep)}
+  .sec{margin-top:26px} .sec-h{display:flex; align-items:baseline; gap:12px; margin:0 2px 12px}
+  .sec-h h2{font-size:13px; font-weight:700; letter-spacing:.10em; text-transform:uppercase; color:var(--ink-2); margin:0}
+  .sec-h .rule{flex:1; height:1px; background:var(--line)} .sec-h .agg{font-family:var(--mono); font-size:12px; color:var(--ink-3)}
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px}
+  .kpi{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:6px; min-height:112px}
+  .kpi.hero{background:radial-gradient(120% 120% at 100% 0%, var(--brand-wash), transparent 60%), var(--surface); border-color:color-mix(in srgb,var(--brand) 30%, var(--line))}
+  .kpi .k-label{font-family:var(--mono); font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3)}
+  .kpi .k-val{font-size:28px; font-weight:800; letter-spacing:-.02em; line-height:1; margin-top:2px}
+  .kpi.hero .k-val{color:var(--brand-deep)}
+  .cards2{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.25fr); gap:14px}
+  @media (max-width:820px){.cards2{grid-template-columns:1fr}}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); padding:18px}
+  .card h3{margin:0 0 12px; font-size:14px; font-weight:700}
+  .donut-wrap{display:flex; align-items:center; gap:18px} @media (max-width:420px){.donut-wrap{flex-direction:column}}
+  .donut{position:relative; width:150px; height:150px; flex:none} .donut svg{transform:rotate(-90deg)}
+  .donut .center{position:absolute; inset:0; display:grid; place-items:center; text-align:center}
+  .donut .center .big{font-size:28px; font-weight:800; line-height:1} .donut .center .cap{font-family:var(--mono); font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); margin-top:3px}
+  .donut circle{transition:opacity .18s, stroke-width .18s} .donut.dim circle{opacity:.28} .donut circle.on{opacity:1; stroke-width:22px}
+  .legend{display:flex; flex-direction:column; gap:8px; flex:1; min-width:120px}
+  .lg{display:flex; align-items:center; gap:9px; font-size:13px; padding:3px 6px; border-radius:8px} .lg:hover{background:var(--surface-2)}
+  .lg .dot{width:10px; height:10px; border-radius:3px; flex:none} .lg .lname{color:var(--ink-2)} .lg .lval{margin-left:auto; font-family:var(--mono); font-weight:600}
+  .bars{display:flex; flex-direction:column; gap:11px}
+  .bar-row{display:grid; grid-template-columns:110px 1fr auto; align-items:center; gap:12px}
+  .bar-row .bl{font-size:13px; color:var(--ink-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .track{height:12px; background:var(--line-2); border-radius:999px; overflow:hidden}
+  .fill{height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,var(--brand),var(--brand-deep)); transition:width 1s cubic-bezier(.2,.7,.2,1)}
+  .bar-row .bv{font-family:var(--mono); font-size:12.5px; font-weight:600; color:var(--ink-2)}
+  .tablecard{background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow); overflow:hidden} .tscroll{overflow-x:auto}
+  table{width:100%; border-collapse:collapse; font-size:13.5px}
+  thead th{font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); text-align:left; padding:12px 14px; border-bottom:1px solid var(--line); white-space:nowrap; background:var(--surface-2)}
+  thead th.num{text-align:right}
+  tbody td{padding:11px 14px; border-bottom:1px solid var(--line-2); vertical-align:middle} tbody tr:last-child td{border-bottom:none}
+  tbody tr{transition:background .12s} tbody tr:hover{background:var(--surface-2)}
+  td.num{text-align:right; font-family:var(--mono); font-variant-numeric:tabular-nums} td.mono{font-family:var(--mono); color:var(--ink-3)}
+  .pill{display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; padding:3px 9px 3px 8px; border-radius:999px; white-space:nowrap}
+  .pill::before{content:""; width:7px; height:7px; border-radius:50%; background:currentColor}
+  .foot{margin-top:26px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; color:var(--ink-3); font-size:12.5px}
+  .brandmark{display:inline-flex; align-items:center; gap:9px; font-weight:700; color:var(--ink-2); font-size:13px}
+  .brandmark .m{width:22px; height:22px; border-radius:6px; background:linear-gradient(135deg,var(--brand),var(--bid)); display:grid; place-items:center; color:#fff; font-family:var(--mono); font-size:11px; font-weight:800}
+  .rise{opacity:0; transform:translateY(10px); animation:rise .6s cubic-bezier(.2,.7,.2,1) forwards} @keyframes rise{to{opacity:1; transform:none}}
+  @media (prefers-reduced-motion:reduce){.rise{animation:none;opacity:1;transform:none} .fill,.donut circle{transition:none!important}}
+  @media print{@page{size:letter; margin:.5in} body{background:#fff;color:#000;padding:0;font-size:11px} .toolbar{display:none!important} .head,.kpi,.card,.tablecard{box-shadow:none;border-color:#d5dbe6;break-inside:avoid} .rise{animation:none;opacity:1;transform:none}}
+</style>
+
+<div class="toolbar">
+  <button class="tbtn" id="themeBtn"><span id="themeIcon"></span><span id="themeLabel">Dark</span></button>
+  <button class="tbtn" id="printBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print / PDF</button>
+</div>
+<div class="wrap" id="app"></div>
+
+<script>
+(function(){
+  "use strict";
+  // ---- fallback: a real engine ENVELOPE for Angie Henderson (person) ----
+  var DEMO={ok:true,entityType:"person",resolvedEntity:"Angie Henderson",ambiguous:false,candidates:[],
+    summary:{headline:"Angie Henderson — Project Manager on 11 projects (2 active), $2,838,707 contract value; 175.8 hrs logged.",
+      metrics:{projectsManaged:11,activeProjectsManaged:2,contractValueManaged:2838707,hoursWorked:175.8,costsApprovedCount:109}},
+    sections:[
+      {title:"Projects Managed",columns:["ProjectID","ProjectName","Client","Status","ContractValue"],
+       rows:[[30,"Siding Replacement","White-Green","Completed",462621],[11,"Roof Replacement","Bass-Warner","On Hold",456751],[83,"Electrical Panel Upgrade","Morse-Atkins","On Hold",438848],[69,"Retaining Wall Construction","Buchanan and Sons","Bid",277665],[91,"Roof Replacement","Collins-Douglas","Completed",272407],[72,"Solar Panel Install","Walker, Gilbert and Acosta","On Hold",271597],[13,"New Home Build","Henderson, Hill and Smith","Active",240265],[79,"Window Installation","Peterson-Wood","On Hold",223656],[51,"Storefront Renovation","Mckinney LLC","Bid",92188],[1,"Warehouse Expansion","Cannon, Anderson and Alvarez","Active",55735],[37,"Basement Finishing","Vaughn Ltd","Bid",46974]],
+       rowCount:11,rowsShown:11,aggregates:{count:11,totalContractValue:2838707,statusBreakdown:{Active:2,"On Hold":4,Completed:2,Bid:3}}},
+      {title:"Labor (as field employee)",columns:["ProjectID","Date","Role","TaskCode","HoursWorked"],rows:[],rowCount:27,rowsShown:0,
+       aggregates:{totalHours:175.8,entries:27,hoursByRole:{Inspector:54.2,"Equipment Operator":36.5,Foreman:29.5,Electrician:28.1,Laborer:27.5}}}
+    ],rowsSampled:{},notes:[]};
+
+  var env=DEMO;
+  try{var h=location.hash.replace(/^#/,""); if(h){ env=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h))))); }}catch(e){ env=DEMO; }
+
+  var reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+  var $=function(id){return document.getElementById(id);};
+  var cssv=function(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();};
+  var STATUS_VAR={"active":"--active","on hold":"--hold","bid":"--bid","completed":"--done","paid":"--active","overdue":"--over","pending":"--hold"};
+  function statusVar(s){return STATUS_VAR[(s||"").toLowerCase()]||"--other";}
+  function titleCase(s){return (s||"").charAt(0).toUpperCase()+(s||"").slice(1);}
+  function prettify(k){var o=k.replace(/([A-Z])/g," $1"); return (o.charAt(0).toUpperCase()+o.slice(1)).trim();}
+  function commas(n){var neg=n<0; var s=Math.abs(Math.round(n)).toString(); var o=""; while(s.length>3){o=","+s.slice(-3)+o; s=s.slice(0,-3);} return (neg?"-":"")+s+o;}
+  function short(n){if(Math.abs(n)>=1e6)return "$"+(n/1e6).toFixed(2)+"M"; if(Math.abs(n)>=1e3)return "$"+commas(n); return "$"+commas(n);}
+  function isMoneyKey(k){k=k.toLowerCase(); return (k.indexOf("value")>=0||k.indexOf("amount")>=0||k.indexOf("spend")>=0||k.indexOf("cost")>=0||k.indexOf("contract")>=0||k.indexOf("variance")>=0||k.indexOf("budget")>=0||k.indexOf("total")>=0||k.indexOf("paid")>=0||k.indexOf("overdue")>=0||k.indexOf("pending")>=0)&&k.indexOf("count")<0;}
+  function isHoursKey(k){return k.toLowerCase().indexOf("hours")>=0;}
+  function fmtMetric(k,v){ if(typeof v!=="number")return String(v); if(isHoursKey(k))return (Math.round(v*10)/10).toString(); if(isMoneyKey(k))return v>=1e6?short(v):("$"+commas(v)); return commas(v);}
+  function fmtCell(col,v){ if(typeof v!=="number")return String(v); var k=col.toLowerCase(); if(k.indexOf("hours")>=0)return (Math.round(v*10)/10).toString(); if(isMoneyKey(k))return "$"+commas(v); return commas(v);}
+  function isNumCol(col){var k=col.toLowerCase(); return k.indexOf("value")>=0||k.indexOf("amount")>=0||k.indexOf("cost")>=0||k.indexOf("hours")>=0||k.indexOf("contract")>=0;}
+  function sectionByHas(pred){for(var i=0;i<env.sections.length;i++){if(pred(env.sections[i]))return env.sections[i];} return null;}
+  function esc(s){return String(s).replace(/[&<>]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c];});}
+
+  document.title=(env.resolvedEntity||"Report")+" — Report";
+  var app=$("app"), html="";
+
+  // ---------- header ----------
+  var kind=titleCase(env.entityType||"")+" Report";
+  var name=env.resolvedEntity||(env.entityType?titleCase(env.entityType):"Report");
+  var chips=[];
+  var mkeys=Object.keys(env.summary&&env.summary.metrics?env.summary.metrics:{});
+  mkeys.slice(0,4).forEach(function(k){chips.push(fmtMetric(k,env.summary.metrics[k])+" "+prettify(k).toLowerCase());});
+  html+='<header class="head rise"><div class="eyebrow"><span>'+esc(kind.toUpperCase())+'</span><span>·</span><b>CUSTOM TRADE WORKFLOWS</b></div>'+
+    '<h1 class="name">'+esc(name)+'</h1><div class="role">'+esc((env.summary&&env.summary.headline)||"")+'</div>'+
+    '<div class="chips">'+chips.map(function(c){return '<span class="chip">'+esc(c)+'</span>';}).join("")+'</div></header>';
+
+  // ---------- ambiguous / empty ----------
+  if(env.ambiguous){
+    html+='<section class="sec rise"><div class="sec-h"><h2>Which one?</h2><span class="rule"></span></div><div class="tablecard"><div class="tscroll"><table><thead><tr><th>Option</th><th>Detail</th></tr></thead><tbody>'+
+      (env.candidates||[]).map(function(c){return '<tr><td>'+esc(c.label)+'</td><td class="mono">'+esc(c.hint||"")+'</td></tr>';}).join("")+'</tbody></table></div></div></section>';
+    app.innerHTML=html; wireCommon(); return;
+  }
+  if(!env.ok){ html+='<section class="sec rise"><div class="role">'+esc(env.error||"No data available.")+'</div></section>'; app.innerHTML=html; wireCommon(); return; }
+
+  // ---------- KPI cards ----------
+  if(mkeys.length){
+    var heroKey=null; for(var i=0;i<mkeys.length;i++){ if(isMoneyKey(mkeys[i])){heroKey=mkeys[i];break;} }
+    html+='<section class="sec rise" style="animation-delay:.06s"><div class="sec-h"><h2>At a glance</h2><span class="rule"></span></div><div class="kpis">';
+    mkeys.slice(0,6).forEach(function(k){ var v=env.summary.metrics[k];
+      html+='<div class="kpi'+(k===heroKey?' hero':'')+'"><div class="k-label">'+esc(prettify(k))+'</div><div class="k-val tnum" data-target="'+(typeof v==="number"?v:0)+'" data-key="'+esc(k)+'">'+esc(typeof v==="number"?"0":String(v))+'</div></div>';
+    });
+    html+='</div></section>';
+  }
+
+  // ---------- charts ----------
+  var charts=buildCharts();
+  if(charts.length){
+    html+='<section class="sec rise" style="animation-delay:.12s"><div class="sec-h"><h2>Breakdown</h2><span class="rule"></span></div><div class="cards2">';
+    charts.forEach(function(c,idx){
+      if(c.type==="donut"){
+        html+='<div class="card"><h3>'+esc(c.title)+'</h3><div class="donut-wrap"><div class="donut" data-donut="'+idx+'"><svg width="150" height="150" viewBox="0 0 150 150"></svg><div class="center"><div><div class="big tnum" data-big="'+idx+'">'+c.total+'</div><div class="cap">total</div></div></div></div><div class="legend" data-legend="'+idx+'"></div></div></div>';
+      } else {
+        html+='<div class="card"><h3>'+esc(c.title)+'</h3><div class="bars" data-bars="'+idx+'"></div></div>';
+      }
+    });
+    if(charts.length===1) html+='<div class="card" style="display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:13px">More detail in the table below.</div>';
+    html+='</div></section>';
+  }
+
+  // ---------- primary table ----------
+  var tbl=sectionByHas(function(s){return s.rows&&s.rows.length&&s.columns&&s.columns.length;});
+  if(tbl){
+    var agg=tbl.aggregates||{};
+    var aggtxt=(agg.count!=null?agg.count+" rows":"")+(agg.totalContractValue!=null?" · $"+commas(agg.totalContractValue):"");
+    html+='<section class="sec rise" style="animation-delay:.18s"><div class="sec-h"><h2>'+esc(tbl.title)+'</h2><span class="rule"></span><span class="agg tnum">'+esc(aggtxt)+'</span></div><div class="tablecard"><div class="tscroll"><table><thead><tr>';
+    tbl.columns.forEach(function(col){ html+='<th class="'+(isNumCol(col)?"num":"")+'">'+esc(col)+'</th>'; });
+    html+='</tr></thead><tbody>';
+    tbl.rows.forEach(function(r){ html+='<tr>';
+      tbl.columns.forEach(function(col,ci){ var v=r[ci];
+        if(col.toLowerCase()==="status"){ html+='<td><span class="pill" style="color:'+cssv(statusVar(v))+';background:color-mix(in srgb,'+cssv(statusVar(v))+' 15%, transparent)">'+esc(v)+'</span></td>'; }
+        else if(col.toLowerCase().indexOf("id")>=0 && ci===0){ html+='<td class="mono">#'+esc(v)+'</td>'; }
+        else if(isNumCol(col)){ html+='<td class="num">'+esc(fmtCell(col,v))+'</td>'; }
+        else { html+='<td>'+esc(fmtCell(col,v))+'</td>'; }
+      });
+      html+='</tr>';
+    });
+    html+='</tbody></table></div></div></section>';
+  }
+
+  // ---------- footer ----------
+  var initials=(env.summary&&env.resolvedEntity?"CT":"CT");
+  html+='<div class="foot rise" style="animation-delay:.24s"><span class="brandmark"><span class="m">CT</span>Custom Trade Workflows</span><span class="mono">Live report</span></div>';
+
+  app.innerHTML=html;
+
+  // ---------- animate ----------
+  requestAnimationFrame(function(){ countUp(); renderCharts(); setTimeout(growBars,140); });
+
+  function countUp(){
+    document.querySelectorAll(".k-val").forEach(function(node){
+      var target=parseFloat(node.getAttribute("data-target"))||0, key=node.getAttribute("data-key");
+      var dur=reduce?0:900, t0=null;
+      if(dur===0){ node.textContent=fmtMetric(key,target); return; }
+      function step(ts){ if(!t0)t0=ts; var p=Math.min(1,(ts-t0)/dur); var e=1-Math.pow(1-p,3); node.textContent=fmtMetric(key,target*e); if(p<1)requestAnimationFrame(step); else node.textContent=fmtMetric(key,target); }
+      requestAnimationFrame(step);
+    });
+  }
+
+  function buildCharts(){
+    var out=[];
+    // donut from a statusBreakdown aggregate
+    var sb=sectionByHas(function(s){return s.aggregates&&s.aggregates.statusBreakdown;});
+    if(sb){ var m=sb.aggregates.statusBreakdown; var pairs=Object.keys(m).map(function(k){return [k,m[k]];}); var tot=pairs.reduce(function(a,b){return a+b[1];},0); out.push({type:"donut",title:"By status",data:pairs,total:tot}); }
+    // bars from hoursByRole aggregate
+    var hr=sectionByHas(function(s){return s.aggregates&&s.aggregates.hoursByRole;});
+    if(hr){ var m2=hr.aggregates.hoursByRole; out.push({type:"bars",title:"Hours by role",data:Object.keys(m2).map(function(k){return [k,m2[k]];}).sort(function(a,b){return b[1]-a[1];})}); }
+    // category-style sections: small tables whose rows read [label, number, ...]
+    // (Spend by Category, Payment Status, Leaderboard). Skips big detail tables
+    // because those lead with a numeric id, not a label.
+    for(var i=0;i<env.sections.length && out.length<2;i++){
+      var s=env.sections[i];
+      if(s.rows && s.rows.length>1 && s.rows.length<=12 && s.columns && s.columns.length>=2 &&
+         typeof s.rows[0][0]==="string" && typeof s.rows[0][1]==="number"){
+        var pr=s.rows.map(function(r){return [String(r[0]),Number(r[1])];});
+        out.push({type: out.length?"bars":"donut", title:s.title, data:pr, total:pr.reduce(function(a,r){return a+r[1];},0)});
+      }
+    }
+    return out.slice(0,2);
+  }
+
+  function renderCharts(){
+    document.querySelectorAll("[data-donut]").forEach(function(node){
+      var idx=+node.getAttribute("data-donut"); var spec=charts[idx]; if(!spec)return;
+      var svg=node.querySelector("svg"), R=60,C=2*Math.PI*R,off=0;
+      var legend=document.querySelector('[data-legend="'+idx+'"]'); var circs=[];
+      spec.data.forEach(function(e,i){
+        var frac=spec.total?e[1]/spec.total:0, len=frac*C;
+        var c=document.createElementNS("http://www.w3.org/2000/svg","circle");
+        c.setAttribute("cx",75);c.setAttribute("cy",75);c.setAttribute("r",R);c.setAttribute("fill","none");
+        c.setAttribute("stroke",cssv(statusVar(e[0])));c.setAttribute("stroke-width","18");
+        c.setAttribute("stroke-dasharray",len+" "+(C-len));c.setAttribute("stroke-dashoffset",-off);
+        svg.appendChild(c); circs.push(c); off+=len;
+        var lg=document.createElement("div"); lg.className="lg";
+        lg.innerHTML='<span class="dot" style="background:'+cssv(statusVar(e[0]))+'"></span><span class="lname">'+esc(e[0])+'</span><span class="lval tnum">'+e[1]+'</span>';
+        (function(ii,ent){ lg.addEventListener("mouseenter",function(){ node.classList.add("dim"); circs[ii].classList.add("on"); node.querySelector('[data-big="'+idx+'"]').textContent=ent[1]; node.querySelector(".cap").textContent=ent[0]; });
+          lg.addEventListener("mouseleave",function(){ node.classList.remove("dim"); circs.forEach(function(x){x.classList.remove("on");}); node.querySelector('[data-big="'+idx+'"]').textContent=spec.total; node.querySelector(".cap").textContent="total"; }); })(i,e);
+        legend.appendChild(lg);
+      });
+    });
+    document.querySelectorAll("[data-bars]").forEach(function(node){
+      var idx=+node.getAttribute("data-bars"); var spec=charts[idx]; if(!spec)return;
+      var mx=spec.data.reduce(function(m,r){return Math.max(m,r[1]);},0)||1;
+      spec.data.forEach(function(r){ var row=document.createElement("div"); row.className="bar-row";
+        var val=(r[1]%1?r[1].toFixed(1):r[1]);
+        row.innerHTML='<div class="bl" title="'+esc(r[0])+'">'+esc(r[0])+'</div><div class="track"><div class="fill" data-w="'+(r[1]/mx*100)+'"></div></div><div class="bv tnum">'+val+'</div>';
+        node.appendChild(row);
+      });
+    });
+  }
+  function growBars(){ document.querySelectorAll(".fill").forEach(function(f){ f.style.width=f.getAttribute("data-w")+"%"; }); }
+
+  function wireCommon(){}
+  // theme + print
+  var root=document.documentElement;
+  function dark(){var t=root.getAttribute("data-theme"); return t?t==="dark":matchMedia("(prefers-color-scheme:dark)").matches;}
+  var SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+  var MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+  function syncTheme(){var d=dark(); $("themeIcon").innerHTML=d?SUN:MOON; $("themeLabel").textContent=d?"Light":"Dark";}
+  $("themeBtn").addEventListener("click",function(){ root.setAttribute("data-theme",dark()?"light":"dark"); syncTheme(); location.reload(); });
+  $("printBtn").addEventListener("click",function(){ window.print(); });
+  syncTheme();
+})();
+</script>
