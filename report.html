@@ -101,7 +101,15 @@
     ],rowsSampled:{},notes:[]};
 
   var env=DEMO;
-  try{var h=location.hash.replace(/^#/,""); if(h){ env=JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(h))))); }}catch(e){ env=DEMO; }
+  try{
+    var h=location.hash.replace(/^#/,"");
+    if(h){
+      // robust base64 decode: undo URL-encoding, restore '+', drop padding/stray, re-pad
+      var b=decodeURIComponent(h).replace(/ /g,"+").replace(/[^A-Za-z0-9+/]/g,"");
+      while(b.length%4) b+="=";
+      env=JSON.parse(decodeURIComponent(escape(atob(b))));
+    }
+  }catch(e){ env=DEMO; }
 
   var reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
   var $=function(id){return document.getElementById(id);};
