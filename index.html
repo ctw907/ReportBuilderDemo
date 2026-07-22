@@ -118,6 +118,9 @@
     text-decoration: none;
   }
   .bubble a.report-link:hover { border-color: var(--brand); }
+  .bubble a.report-link + a.report-link { margin-left: 8px; }
+  .bubble a.report-link--excel { color: #217346; }
+  .bubble a.report-link--excel:hover { border-color: #217346; }
 
   .status-tag {
     display: inline-block;
@@ -262,6 +265,16 @@ function addMessage(role, text, opts = {}) {
     bubble.appendChild(a);
   }
 
+  if (opts.excel) {
+    const x = document.createElement("a");
+    x.className = "report-link report-link--excel";
+    x.href = opts.excel;
+    x.target = "_blank";
+    x.rel = "noopener";
+    x.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> Download Excel';
+    bubble.appendChild(x);
+  }
+
   wrap.appendChild(bubble);
   logEl.appendChild(wrap);
   logEl.scrollTop = logEl.scrollHeight;
@@ -311,7 +324,8 @@ async function send() {
         transcript: transcript,    // explicit copy for clarity / future use
         turns: conversation,       // structured [{role, content}, ...] history
         requester: CONFIG.requester,
-        conversationId: conversationId
+        conversationId: conversationId,
+        channel: "chat"            // this surface returns a LINK (report + Excel), not inline
       })
     });
 
@@ -337,7 +351,7 @@ async function send() {
       addMessage("bot", botReply, { statusTag: "err" });
     } else {
       botReply = data.reply || "Here's your report.";
-      addMessage("bot", botReply, { link: data.link || data.url });
+      addMessage("bot", botReply, { link: data.link || data.url, excel: data.excel });
     }
     // record the assistant turn so it's part of the next request's context
     conversation.push({ role: "assistant", content: botReply });
