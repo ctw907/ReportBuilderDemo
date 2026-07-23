@@ -11,7 +11,9 @@
     --ink:           #1f2733;
     --ink-soft:      #5b6675;
     --line:          #e6e9ef;
+    --line-2:        #eef1f6;
     --brand:         #2f6df6;   /* swap for your brand color */
+    --brand-deep:    #1b4db3;
     --brand-ink:     #ffffff;
     --bot-bubble:    #f1f4f9;
     --user-bubble:   #2f6df6;
@@ -49,7 +51,10 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    transition: max-width .45s cubic-bezier(.2,.7,.2,1);
   }
+  /* the chat grows once a report renders inline, so dashboards get room */
+  .chat.chat--wide { max-width: 760px; }
 
   .chat__header {
     display: flex;
@@ -84,6 +89,7 @@
   .msg { display: flex; max-width: 88%; }
   .msg--bot  { align-self: flex-start; }
   .msg--user { align-self: flex-end; }
+  .msg--report { align-self: stretch; max-width: 100%; }
 
   .bubble {
     padding: 10px 14px;
@@ -109,6 +115,7 @@
     align-items: center;
     gap: 8px;
     margin-top: 8px;
+    margin-right: 8px;
     padding: 9px 13px;
     background: #fff;
     border: 1px solid var(--line);
@@ -118,9 +125,6 @@
     text-decoration: none;
   }
   .bubble a.report-link:hover { border-color: var(--brand); }
-  .bubble a.report-link + a.report-link { margin-left: 8px; }
-  .bubble a.report-link--excel { color: #217346; }
-  .bubble a.report-link--excel:hover { border-color: #217346; }
 
   .status-tag {
     display: inline-block;
@@ -180,6 +184,143 @@
   .chat__send:disabled { opacity: .5; cursor: not-allowed; }
 
   .hint { font-size: 11px; color: var(--ink-soft); padding: 0 16px 12px; text-align:center; }
+
+  /* ============================================================
+     Inline report card (rendered from the engine envelope)
+     ============================================================ */
+  .rcard {
+    width: 100%;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    border-bottom-left-radius: 5px;
+    padding: 16px;
+    box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 10px 24px -14px rgba(16,24,40,.16);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    animation: rrise .5s cubic-bezier(.2,.7,.2,1);
+  }
+  @keyframes rrise { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform:none; } }
+  .rcard .r-eyebrow {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-soft); display: flex; gap: 8px; flex-wrap: wrap;
+  }
+  .rcard .r-eyebrow b { color: var(--brand); font-weight: 700; }
+  .rcard .r-name { margin: 2px 0 0; font-size: 19px; font-weight: 750; letter-spacing: -.01em; line-height: 1.15; }
+
+  .rkpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }
+  .rkpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fbfcfe; min-width: 0; }
+  .rkpi .lab { font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rkpi .val { font-size: 19px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .rkpi.hero { background: linear-gradient(135deg, rgba(47,109,246,.08), rgba(47,109,246,.02)); border-color: rgba(47,109,246,.35); }
+  .rkpi.hero .val { color: var(--brand-deep); }
+
+  .rsec { min-width: 0; }
+  .rsec > h4 {
+    margin: 0 0 9px; font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--ink-soft); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; row-gap: 6px;
+  }
+  .rsec > h4 .rule { flex: 1; height: 1px; background: var(--line); min-width: 24px; }
+  .rsec > h4 .agg { font-weight: 600; letter-spacing: 0; text-transform: none; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+
+  .rcharts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+  .rchart { border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .rchart h5 { margin: 0 0 10px; font-size: 12.5px; font-weight: 700; }
+  .rbars { display: flex; flex-direction: column; gap: 9px; }
+  .bar-row { display: grid; grid-template-columns: minmax(72px, 96px) 1fr auto; align-items: center; gap: 9px; }
+  .bar-row .bl { font-size: 12px; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-row .track { height: 10px; background: var(--line-2); border-radius: 999px; overflow: hidden; }
+  .bar-row .fill { height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, var(--brand), var(--brand-deep)); transition: width .9s cubic-bezier(.2,.7,.2,1); }
+  .bar-row .bv { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+  .rtrend { border: 1px solid var(--line); border-radius: 10px; padding: 12px; position: relative; min-width: 0; }
+  .rtrend h5 { margin: 0 0 8px; font-size: 12.5px; font-weight: 700; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .rtrend .tsum { font-size: 11px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rtrend svg { display: block; width: 100%; height: auto; }
+  .rtrend .tline { fill: none; stroke: var(--brand); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .rtrend .tdot { fill: #fff; stroke: var(--brand); stroke-width: 1.6; transition: r .12s; }
+  .rtrend .tdot.on { fill: var(--brand); }
+  .rtrend .tx { font-size: 10px; fill: var(--ink-soft); }
+  .rtrend .tgrid { stroke: var(--line-2); stroke-width: 1; }
+  .rtrend .tguide { stroke: var(--brand); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; transition: opacity .12s; }
+  .rtrend .tguide.on { opacity: .7; }
+  .rtrend .ttip {
+    position: absolute; pointer-events: none; background: var(--ink); color: #fff;
+    font-size: 11px; padding: 4px 8px; border-radius: 7px; white-space: nowrap;
+    transform: translate(-50%, -130%); opacity: 0; transition: opacity .12s; z-index: 3;
+  }
+
+  .rtablewrap { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .rtscroll { overflow-x: auto; max-height: 340px; overflow-y: auto; }
+  .rcard table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .rcard thead th {
+    font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-soft);
+    text-align: left; padding: 9px 11px; border-bottom: 1px solid var(--line); white-space: nowrap;
+    background: #fbfcfe; position: sticky; top: 0; z-index: 1;
+  }
+  .rcard thead th.num { text-align: right; }
+  .rcard thead th.sortable { cursor: pointer; user-select: none; transition: color .12s; }
+  .rcard thead th.sortable:hover { color: var(--brand); }
+  .rcard thead th.sortable:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; color: var(--brand); }
+  .rcard thead th.sorted { color: var(--brand-deep); }
+  .rcard thead th .sarr { display: inline-block; min-width: 9px; margin-left: 4px; color: var(--brand); font-size: 8px; vertical-align: 1px; }
+  .rcard tbody td { padding: 8px 11px; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+  .rcard tbody tr:last-child td { border-bottom: none; }
+  .rcard tbody tr { transition: background .12s; }
+  .rcard tbody tr:hover { background: #f6f8fc; }
+  .rcard td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rcard td.mono { color: var(--ink-soft); }
+  .rcard tr.nores td { text-align: center; color: var(--ink-soft); padding: 18px 11px; }
+  .rpill {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
+    padding: 2px 8px 2px 7px; border-radius: 999px; white-space: nowrap;
+  }
+  .rpill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  /* drill-down: rows open that job, highlighted names ask about that entity */
+  .rcard tbody tr.drillable { cursor: pointer; }
+  .rcard tbody tr.drillable:hover { background: #eef3fe; }
+  .rcard tbody tr.drillable td:first-child { position: relative; }
+  .rcard tbody tr.drillable:hover td:first-child::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brand); }
+  .rcard .cell-entity { cursor: pointer; color: var(--brand); text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
+  .rcard .cell-entity:hover { text-decoration-style: solid; }
+  /* status-bar drill: click a "By status" bar to ask for those jobs */
+  .rcard .bar-row.drillable { cursor: pointer; border-radius: 8px; padding: 3px 5px; margin: -3px -5px; transition: background .12s; }
+  .rcard .bar-row.drillable:hover { background: #eef3fe; }
+  .rcard .bar-row.drillable:hover .bl { color: var(--brand-deep); }
+  .rcard .bar-row.drillable:focus-visible { background: #eef3fe; outline: 2px solid var(--brand); outline-offset: -2px; }
+  .rcard .rdrill { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--ink-soft); margin: 7px 2px 0; }
+  .rcard .rdrill svg { width: 12px; height: 12px; flex: none; color: var(--brand); }
+
+  /* ambiguous match: clickable "Which one?" candidate list */
+  .rcand { display: flex; flex-direction: column; gap: 6px; }
+  .rcand .cand {
+    display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; text-align: left;
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fbfcfe;
+    font: inherit; color: var(--ink); cursor: pointer; transition: border-color .12s, background .12s;
+  }
+  .rcand .cand:hover { border-color: var(--brand); background: #eef3fe; }
+  .rcand .cand:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+  .rcand .cand .ct { display: flex; flex-direction: column; min-width: 0; }
+  .rcand .cand .cl { font-size: 13px; font-weight: 700; line-height: 1.25; }
+  .rcand .cand .ch { font-size: 11.5px; color: var(--ink-soft); margin-top: 1px; }
+  .rcand .cand svg { width: 14px; height: 14px; flex: none; margin-left: auto; color: var(--brand); }
+
+  .tsearch {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px;
+    padding: 4px 9px; background: #fff; transition: border-color .12s;
+  }
+  .tsearch:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(47,109,246,.12); }
+  .tsearch svg { width: 12px; height: 12px; color: var(--ink-soft); flex: none; }
+  .tsearch input { border: none; outline: none; background: transparent; font: inherit; font-size: 12px; color: var(--ink); width: 110px; }
+  .tsearch input::placeholder { color: var(--ink-soft); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rcard { animation: none; }
+    .bar-row .fill { transition: none !important; }
+    .chat { transition: none; }
+  }
 </style>
 </head>
 <body>
@@ -265,13 +406,13 @@ function addMessage(role, text, opts = {}) {
     bubble.appendChild(a);
   }
 
-  if (opts.excel) {
+  if (opts.excel && typeof opts.excel === "string" && /^https?:\/\//i.test(opts.excel)) {
     const x = document.createElement("a");
-    x.className = "report-link report-link--excel";
+    x.className = "report-link";
     x.href = opts.excel;
     x.target = "_blank";
     x.rel = "noopener";
-    x.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg> Download Excel';
+    x.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg> Open in Excel';
     bubble.appendChild(x);
   }
 
@@ -294,8 +435,10 @@ function hideTyping() {
   if (t) t.remove();
 }
 
-async function send() {
-  const text = inputEl.value.trim();
+async function send(forcedText) {
+  // forcedText lets drill-down clicks (report-card rows / entity names) submit a
+  // follow-up query programmatically; normal sends keep reading the composer.
+  const text = (typeof forcedText === "string" ? forcedText : inputEl.value).trim();
   if (!text || busy) return;
 
   if (CONFIG.flowUrl.startsWith("PASTE_")) {
@@ -305,7 +448,7 @@ async function send() {
 
   addMessage("user", text);
   conversation.push({ role: "user", content: text });   // record before sending
-  inputEl.value = "";
+  if (typeof forcedText !== "string") { inputEl.value = ""; }   // keep any half-typed text on drill sends
   inputEl.style.height = "auto";
   setBusy(true);
   showTyping();
@@ -324,8 +467,7 @@ async function send() {
         transcript: transcript,    // explicit copy for clarity / future use
         turns: conversation,       // structured [{role, content}, ...] history
         requester: CONFIG.requester,
-        conversationId: conversationId,
-        channel: "chat"            // this surface returns a LINK (report + Excel), not inline
+        conversationId: conversationId
       })
     });
 
@@ -352,6 +494,7 @@ async function send() {
     } else {
       botReply = data.reply || "Here's your report.";
       addMessage("bot", botReply, { link: data.link || data.url, excel: data.excel });
+      tryRenderEnvelope(data);   // inline dashboard card, best-effort & additive
     }
     // record the assistant turn so it's part of the next request's context
     conversation.push({ role: "assistant", content: botReply });
@@ -370,6 +513,406 @@ function setBusy(v) {
   sendEl.disabled = v;
 }
 
+/* ============================================================
+   Inline envelope rendering — the same engine envelope that
+   report.html shows full-page, rendered as a live card in the
+   chat (KPIs, breakdown bars, monthly trends, sortable table).
+   Entirely best-effort: any failure leaves the classic
+   reply + "Open report" link behavior untouched.
+   ============================================================ */
+const REDUCE = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const STATUS_COLORS = { "active":"#16A34A", "on hold":"#E0A100", "bid":"#8B5CF6", "completed":"#64748B", "paid":"#16A34A", "overdue":"#DC2626", "pending":"#E0A100" };
+// columns whose values are entities you can drill into (same map as app.html)
+const ENTITY_COLS = { clientname:"client", client:"client", vendorname:"vendor", vendor:"vendor", projectmanager:"person", crewlead:"person", employee:"person", employeename:"person", approvedby:"person" };
+let trendUid = 0;
+
+function projectQuery(id){ return "Show me project " + id; }
+function entityQuery(name){ return "Show me " + name; }
+// same semantics as app.html's candidate drill
+function candQuery(c){ if (c.entityType === "project") return "Show me project " + c.entityValue; return "Show me " + (c.entityValue || c.label); }
+// same semantics as app.html's donut-legend drill: scope to the person when we can
+function statusQuery(env, status){ if (env && env.entityType === "person" && env.resolvedEntity) return "Show me " + env.resolvedEntity + "'s " + String(status).toLowerCase() + " jobs"; return "Show me " + String(status).toLowerCase() + " jobs"; }
+
+function statusColor(s){ return STATUS_COLORS[(s||"").toLowerCase()] || "#2f6df6"; }
+function titleCase(s){ return (s||"").charAt(0).toUpperCase() + (s||"").slice(1); }
+function prettify(k){ const o = k.replace(/([A-Z])/g, " $1"); return (o.charAt(0).toUpperCase() + o.slice(1)).trim(); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function commas(n){ let neg = n < 0, s = Math.abs(Math.round(n)).toString(), o = ""; while (s.length > 3) { o = "," + s.slice(-3) + o; s = s.slice(0, -3); } return (neg ? "-" : "") + s + o; }
+function short(n){ if (Math.abs(n) >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M"; return "$" + commas(n); }
+function isMoneyKey(k){ k = k.toLowerCase(); return (k.indexOf("value")>=0||k.indexOf("amount")>=0||k.indexOf("spend")>=0||k.indexOf("cost")>=0||k.indexOf("contract")>=0||k.indexOf("variance")>=0||k.indexOf("budget")>=0||k.indexOf("total")>=0||k.indexOf("paid")>=0||k.indexOf("overdue")>=0||k.indexOf("pending")>=0) && k.indexOf("count")<0; }
+function isHoursKey(k){ return k.toLowerCase().indexOf("hours") >= 0; }
+function fmtMetric(k, v){ if (typeof v !== "number") return String(v); if (isHoursKey(k)) return (Math.round(v*10)/10).toString(); if (isMoneyKey(k)) return v >= 1e6 ? short(v) : ("$" + commas(v)); return commas(v); }
+function fmtCell(col, v){ if (typeof v !== "number") return String(v); const k = col.toLowerCase(); if (k.indexOf("hours") >= 0) return (Math.round(v*10)/10).toString(); if (isMoneyKey(k)) return "$" + commas(v); return commas(v); }
+function isNumCol(col){ const k = col.toLowerCase(); return k.indexOf("value")>=0||k.indexOf("amount")>=0||k.indexOf("cost")>=0||k.indexOf("hours")>=0||k.indexOf("contract")>=0; }
+function monthLabel(k){ const p = String(k).split("-"); const mi = +p[1] - 1; return (MONTHS[mi] || p[1]) + " '" + String(p[0]).slice(2); }
+function fmtTrendVal(t, v){ if (t.unit === "hours") return (Math.round(v*10)/10) + " hrs"; return v >= 1e6 ? short(v) : "$" + commas(v); }
+
+// Pull an envelope out of a flow response: `data` object (answer / web shapes),
+// else decode the base64 fragment of the report.html link (chat shape).
+function extractEnvelope(data) {
+  try {
+    if (data && data.data && typeof data.data === "object" && (Array.isArray(data.data.sections) || (data.data.ambiguous && Array.isArray(data.data.candidates)))) return data.data;
+    const link = data && (data.link || data.url);
+    if (typeof link === "string") {
+      const hi = link.indexOf("#");
+      if (hi >= 0 && hi < link.length - 1) {
+        let b = decodeURIComponent(link.slice(hi + 1)).replace(/ /g, "+").replace(/[^A-Za-z0-9+/]/g, "");
+        while (b.length % 4) b += "=";
+        const env = JSON.parse(decodeURIComponent(escape(atob(b))));
+        if (env && (Array.isArray(env.sections) || (env.ambiguous && Array.isArray(env.candidates)))) return env;
+      }
+    }
+  } catch (e) { /* not an envelope — fine */ }
+  return null;
+}
+
+function tryRenderEnvelope(data) {
+  try {
+    const env = extractEnvelope(data);
+    if (!env) return;
+    if (env.ambiguous) {   // "which one?" picker — tap a candidate to ask for it
+      const pick = renderCandidateCard(env);
+      if (!pick) return;
+      const pwrap = document.createElement("div");
+      pwrap.className = "msg msg--bot msg--report";
+      pwrap.appendChild(pick);
+      logEl.appendChild(pwrap);
+      requestAnimationFrame(() => { logEl.scrollTop = logEl.scrollHeight; });
+      return;
+    }
+    if (env.ok !== true) return;
+    const card = renderEnvelopeCard(env);
+    if (!card) return;
+    const wrap = document.createElement("div");
+    wrap.className = "msg msg--bot msg--report";
+    wrap.appendChild(card);
+    logEl.appendChild(wrap);
+    document.querySelector(".chat").classList.add("chat--wide");
+    requestAnimationFrame(() => { logEl.scrollTop = logEl.scrollHeight; });
+  } catch (e) { /* inline preview is best-effort; chat behavior unchanged */ }
+}
+
+function renderCandidateCard(env) {
+  const cands = (env.candidates || []).filter(c => c && (c.label || c.entityValue));
+  if (!cands.length) return null;
+  const card = document.createElement("div");
+  card.className = "rcard";
+  let html = '<div><div class="r-eyebrow"><span>AMBIGUOUS MATCH</span><span>·</span><b>' + cands.length + ' POSSIBLE</b></div>' +
+             '<div class="r-name">Which one do you mean?</div></div>';
+  html += '<div class="rcand">';
+  cands.forEach(c => {
+    const q = candQuery(c);
+    html += '<button type="button" class="cand" data-cand-q="' + esc(q) + '" title="' + esc(q) + '">' +
+            '<span class="ct"><span class="cl">' + esc(c.label || c.entityValue) + '</span>' +
+            (c.hint ? '<span class="ch">' + esc(c.hint) + '</span>' : '') + '</span>' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>';
+  });
+  html += '</div><div class="rdrill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>Click the one you mean &mdash; I&rsquo;ll pull that report.</div>';
+  card.innerHTML = html;
+  card.querySelectorAll(".cand").forEach(btn => {
+    btn.addEventListener("click", () => send(btn.getAttribute("data-cand-q")));
+  });
+  return card;
+}
+
+function renderEnvelopeCard(env) {
+  const card = document.createElement("div");
+  card.className = "rcard";
+  let html = "";
+
+  // header
+  const kind = (env.entityType ? titleCase(env.entityType) + " report" : "Report");
+  html += '<div><div class="r-eyebrow"><span>' + esc(kind.toUpperCase()) + '</span><span>·</span><b>LIVE DATA</b></div>' +
+          '<div class="r-name">' + esc(env.resolvedEntity || "Report") + '</div></div>';
+
+  // KPI tiles
+  const metrics = (env.summary && env.summary.metrics) ? env.summary.metrics : {};
+  const mkeys = Object.keys(metrics);
+  if (mkeys.length) {
+    let heroKey = null;
+    for (const k of mkeys) { if (isMoneyKey(k)) { heroKey = k; break; } }
+    html += '<div class="rkpis">';
+    mkeys.slice(0, 6).forEach(k => {
+      html += '<div class="rkpi' + (k === heroKey ? " hero" : "") + '"><div class="lab" title="' + esc(prettify(k)) + '">' + esc(prettify(k)) + '</div><div class="val" data-target="' + (typeof metrics[k] === "number" ? metrics[k] : 0) + '" data-key="' + esc(k) + '">' + esc(typeof metrics[k] === "number" ? "0" : String(metrics[k])) + '</div></div>';
+    });
+    html += '</div>';
+  }
+
+  // breakdown bars (status mix, hours by role, or small category sections)
+  const charts = buildBarCharts(env);
+  if (charts.length) {
+    const hasStatusDrill = charts.some(c => c.drill === "status");
+    html += '<div class="rsec"><h4>Breakdown<span class="rule"></span>' + (hasStatusDrill ? '<span class="agg">click a status to see those jobs</span>' : '') + '</h4><div class="rcharts">';
+    charts.forEach((c, ci) => {
+      html += '<div class="rchart"><h5>' + esc(c.title) + '</h5><div class="rbars" data-bars="' + ci + '">';
+      c.data.forEach(r => {
+        const val = (typeof r[1] === "number" && r[1] % 1) ? r[1].toFixed(1) : r[1];
+        const rowAttr = (c.drill === "status")
+          ? ' class="bar-row drillable" tabindex="0" role="button" data-status-q="' + esc(statusQuery(env, r[0])) + '" title="' + esc("Show " + String(r[0]).toLowerCase() + " jobs") + '"'
+          : ' class="bar-row"';
+        html += '<div' + rowAttr + '><div class="bl" title="' + esc(r[0]) + '">' + esc(r[0]) + '</div><div class="track"><div class="fill" data-w="' + (c.max ? (r[1] / c.max * 100) : 0) + '" style="background:' + (c.statusColors ? "linear-gradient(90deg," + statusColor(r[0]) + "," + statusColor(r[0]) + ")" : "") + '"></div></div><div class="bv">' + esc(c.money ? "$" + commas(r[1]) : String(val)) + '</div></div>';
+      });
+      html += '</div></div>';
+    });
+    html += '</div></div>';
+  }
+
+  // monthly trends (envelope.trends, additive field)
+  const trends = (env.trends || []).filter(t => t && t.points && t.points.length >= 2).slice(0, 2);
+  if (trends.length) {
+    html += '<div class="rsec"><h4>Monthly trend<span class="rule"></span><span class="agg">hover for detail</span></h4><div class="rcharts">';
+    trends.forEach((t, ti) => {
+      let tot = 0; t.points.forEach(p => { tot += Number(p[1]) || 0; });
+      html += '<div class="rtrend" data-trend="' + ti + '"><h5>' + esc(t.label || "Trend") + '<span class="tsum">' + esc(fmtTrendVal(t, tot)) + ' total</span></h5><svg viewBox="0 0 520 170" role="img" aria-label="' + esc(t.label || "Trend") + '"></svg><div class="ttip"></div></div>';
+    });
+    html += '</div></div>';
+  }
+
+  // primary table (sortable + filterable)
+  let tbl = null;
+  for (const s of env.sections) { if (s.rows && s.rows.length && s.columns && s.columns.length) { tbl = s; break; } }
+  if (tbl) {
+    const agg = tbl.aggregates || {};
+    html += '<div class="rsec"><h4>' + esc(tbl.title) + '<span class="rule"></span>' +
+      '<label class="tsearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>' +
+      '<input type="text" class="tfilter" placeholder="Filter rows&hellip;" aria-label="Filter table rows" autocomplete="off"></label>' +
+      '<span class="agg tcount"></span></h4><div class="rtablewrap"><div class="rtscroll"><table><thead><tr>';
+    tbl.columns.forEach((col, ci) => {
+      html += '<th class="sortable' + (isNumCol(col) ? " num" : "") + '" data-si="' + ci + '" tabindex="0" role="button" title="Sort by ' + esc(col) + '">' + esc(col) + '<span class="sarr"></span></th>';
+    });
+    html += '</tr></thead><tbody></tbody></table></div></div>';
+    const canDrill = tbl.columns.indexOf("ProjectID") >= 0;
+    const hasEnt = tbl.columns.some(c => ENTITY_COLS[String(c).toLowerCase()]);
+    if (canDrill || hasEnt) {
+      const hint = canDrill
+        ? (hasEnt ? "Click a row to open that job &mdash; or a highlighted name to ask about it." : "Click a row to open that job.")
+        : "Click a highlighted name to ask about it.";
+      html += '<div class="rdrill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>' + hint + '</div>';
+    }
+    html += '</div>';
+  }
+
+  card.innerHTML = html;
+
+  // ---- wire interactivity (all scoped to this card) ----
+  wireKpis(card);
+  wireBars(card, charts);
+  wireStatusDrills(card);
+  wireTrends(card, trends);
+  if (tbl) wireTable(card, tbl);
+  return card;
+}
+
+function wireStatusDrills(card) {
+  card.querySelectorAll(".bar-row.drillable").forEach(row => {
+    const q = row.getAttribute("data-status-q");
+    if (!q) return;
+    row.addEventListener("click", () => send(q));
+    row.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); send(q); } });
+  });
+}
+
+function buildBarCharts(env) {
+  const out = [];
+  const secBy = pred => { for (const s of env.sections) { if (pred(s)) return s; } return null; };
+  const sb = secBy(s => s.aggregates && s.aggregates.statusBreakdown);
+  if (sb) {
+    const m = sb.aggregates.statusBreakdown;
+    const pairs = Object.keys(m).map(k => [k, m[k]]).sort((a, b) => b[1] - a[1]);
+    out.push({ title: "By status", data: pairs, max: pairs.reduce((x, r) => Math.max(x, r[1]), 0) || 1, statusColors: true, drill: "status" });
+  }
+  const hr = secBy(s => s.aggregates && s.aggregates.hoursByRole);
+  if (hr) {
+    const m = hr.aggregates.hoursByRole;
+    const pairs = Object.keys(m).map(k => [k, m[k]]).sort((a, b) => b[1] - a[1]);
+    out.push({ title: "Hours by role", data: pairs, max: pairs.reduce((x, r) => Math.max(x, r[1]), 0) || 1 });
+  }
+  // small category sections (label + number rows), e.g. Spend by Category
+  for (const s of env.sections) {
+    if (out.length >= 2) break;
+    if (s.rows && s.rows.length > 1 && s.rows.length <= 12 && s.columns && s.columns.length >= 2 &&
+        typeof s.rows[0][0] === "string" && typeof s.rows[0][1] === "number") {
+      const pairs = s.rows.map(r => [String(r[0]), Number(r[1])]).sort((a, b) => b[1] - a[1]);
+      out.push({ title: s.title, data: pairs, max: pairs.reduce((x, r) => Math.max(x, r[1]), 0) || 1, money: isMoneyKey(s.columns[1] || "") });
+    }
+  }
+  return out.slice(0, 2);
+}
+
+function wireKpis(card) {
+  card.querySelectorAll(".rkpi .val").forEach(node => {
+    const target = parseFloat(node.getAttribute("data-target")) || 0;
+    const key = node.getAttribute("data-key");
+    if (node.textContent !== "0") return;   // non-numeric metric, left as-is
+    if (REDUCE) { node.textContent = fmtMetric(key, target); return; }
+    const dur = 800; let t0 = null;
+    function step(ts) {
+      if (!t0) t0 = ts;
+      const p = Math.min(1, (ts - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      node.textContent = fmtMetric(key, target * e);
+      if (p < 1) requestAnimationFrame(step); else node.textContent = fmtMetric(key, target);
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+function wireBars(card) {
+  requestAnimationFrame(() => setTimeout(() => {
+    card.querySelectorAll(".fill").forEach(f => { f.style.width = f.getAttribute("data-w") + "%"; });
+  }, 120));
+}
+
+function wireTrends(card, trends) {
+  card.querySelectorAll("[data-trend]").forEach(box => {
+    const t = trends[+box.getAttribute("data-trend")];
+    if (!t) return;
+    const svg = box.querySelector("svg"), tip = box.querySelector(".ttip"), NS = "http://www.w3.org/2000/svg";
+    const W = 520, H = 170, padL = 16, padR = 16, padT = 14, padB = 26, n = t.points.length;
+    const innerW = W - padL - padR, innerH = H - padT - padB;
+    let mx = 0; t.points.forEach(p => { mx = Math.max(mx, Number(p[1]) || 0); }); if (!mx) mx = 1;
+    const X = i => padL + innerW * (n > 1 ? i / (n - 1) : .5);
+    const Y = v => padT + innerH * (1 - (Number(v) || 0) / mx);
+    const el = (name, attrs) => { const e = document.createElementNS(NS, name); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+    const gid = "ixgrad" + (trendUid++);
+    const defs = el("defs", {}), grad = el("linearGradient", { id: gid, x1: "0", y1: "0", x2: "0", y2: "1" });
+    const s1 = el("stop", { offset: "0%" }); s1.style.stopColor = "#2f6df6"; s1.style.stopOpacity = ".24";
+    const s2 = el("stop", { offset: "100%" }); s2.style.stopColor = "#2f6df6"; s2.style.stopOpacity = "0";
+    grad.appendChild(s1); grad.appendChild(s2); defs.appendChild(grad); svg.appendChild(defs);
+    svg.appendChild(el("line", { x1: padL, y1: padT + innerH, x2: padL + innerW, y2: padT + innerH, "class": "tgrid" }));
+    svg.appendChild(el("line", { x1: padL, y1: padT, x2: padL + innerW, y2: padT, "class": "tgrid", "stroke-dasharray": "2 4" }));
+    const mxl = el("text", { x: padL, y: padT - 4, "class": "tx" }); mxl.textContent = fmtTrendVal(t, mx); svg.appendChild(mxl);
+    let dA = "M" + X(0) + "," + (padT + innerH), dL = "";
+    t.points.forEach((p, i) => { const x = X(i), y = Y(p[1]); dA += " L" + x + "," + y; dL += (i ? " L" : "M") + x + "," + y; });
+    dA += " L" + X(n - 1) + "," + (padT + innerH) + " Z";
+    const area = el("path", { d: dA, fill: "url(#" + gid + ")" }); svg.appendChild(area);
+    const line = el("path", { d: dL, "class": "tline" }); svg.appendChild(line);
+    const step = Math.max(1, Math.ceil(n / 5));
+    const addX = i => { const tx = el("text", { x: X(i), y: H - 8, "text-anchor": i === 0 ? "start" : (i === n - 1 ? "end" : "middle"), "class": "tx" }); tx.textContent = monthLabel(t.points[i][0]); svg.appendChild(tx); };
+    for (let i = 0; i < n; i += step) { if (n - 1 - i < step && i !== n - 1) continue; addX(i); }
+    if ((n - 1) % step !== 0) addX(n - 1);
+    const guide = el("line", { y1: padT, y2: padT + innerH, x1: X(0), x2: X(0), "class": "tguide" }); svg.appendChild(guide);
+    const dots = t.points.map((p, i) => { const d = el("circle", { cx: X(i), cy: Y(p[1]), r: n > 18 ? 2.4 : 3.4, "class": "tdot" }); svg.appendChild(d); return d; });
+    if (!REDUCE && !document.hidden) {
+      try {
+        const len = line.getTotalLength();
+        line.style.strokeDasharray = len; line.style.strokeDashoffset = len;
+        line.style.transition = "stroke-dashoffset .9s cubic-bezier(.2,.7,.2,1)";
+        area.style.opacity = "0"; area.style.transition = "opacity .7s .3s";
+        requestAnimationFrame(() => { line.style.strokeDashoffset = "0"; area.style.opacity = "1"; });
+      } catch (e) {}
+    }
+    let hot = -1;
+    function setHot(i) {
+      if (i === hot) return;
+      if (hot >= 0) { dots[hot].classList.remove("on"); dots[hot].setAttribute("r", n > 18 ? 2.4 : 3.4); }
+      hot = i;
+      if (i < 0) { guide.classList.remove("on"); tip.style.opacity = "0"; return; }
+      dots[i].classList.add("on"); dots[i].setAttribute("r", n > 18 ? 4 : 4.8);
+      guide.setAttribute("x1", X(i)); guide.setAttribute("x2", X(i)); guide.classList.add("on");
+      const r = svg.getBoundingClientRect(), sx = r.width / W, sy = r.height / H;
+      tip.innerHTML = "<b>" + esc(monthLabel(t.points[i][0])) + "</b> &middot; " + esc(fmtTrendVal(t, Number(t.points[i][1]) || 0));
+      tip.style.left = (svg.offsetLeft + X(i) * sx) + "px";
+      tip.style.top = (svg.offsetTop + Y(t.points[i][1]) * sy) + "px";
+      tip.style.opacity = "1";
+    }
+    const toIdx = ev => { const r = svg.getBoundingClientRect(); const x = (ev.clientX - r.left) * (W / r.width); const i = Math.round((x - padL) / (innerW / (n - 1))); return Math.max(0, Math.min(n - 1, i)); };
+    svg.addEventListener("mousemove", ev => setHot(toIdx(ev)));
+    svg.addEventListener("mouseleave", () => setHot(-1));
+    svg.addEventListener("touchstart", ev => { if (ev.touches.length) setHot(toIdx(ev.touches[0])); }, { passive: true });
+  });
+}
+
+function wireTable(card, tbl) {
+  const agg = tbl.aggregates || {};
+  const st = {
+    cols: tbl.columns, rows: tbl.rows, sort: -1, dir: 1, q: "",
+    idIdx: tbl.columns.indexOf("ProjectID"),
+    count: (agg.count != null ? agg.count : tbl.rows.length),
+    extra: (agg.totalContractValue != null ? " · $" + commas(agg.totalContractValue) : "")
+  };
+  const tbody = card.querySelector("tbody");
+  const countEl = card.querySelector(".tcount");
+  const ths = card.querySelectorAll("th.sortable");
+
+  function rowHTML(r) {
+    const drillAttr = (st.idIdx >= 0 && r[st.idIdx] != null && r[st.idIdx] !== "")
+      ? ' class="drillable" data-drill-q="' + esc(projectQuery(r[st.idIdx])) + '" title="Open this job"'
+      : "";
+    let h = "<tr" + drillAttr + ">";
+    st.cols.forEach((col, ci) => {
+      const v = r[ci];
+      const lc = col.toLowerCase();
+      if (lc === "status") {
+        const c = statusColor(v);
+        h += '<td><span class="rpill" style="color:' + c + ';background:' + c + '26">' + esc(v) + '</span></td>';
+      } else if (lc.indexOf("id") >= 0 && ci === 0) {
+        h += '<td class="mono">#' + esc(v) + '</td>';
+      } else if (ENTITY_COLS[lc] && v && typeof v === "string") {
+        h += '<td><span class="cell-entity" data-entity-q="' + esc(entityQuery(v)) + '" title="Ask about ' + esc(v) + '">' + esc(v) + '</span></td>';
+      } else if (isNumCol(col)) {
+        h += '<td class="num">' + esc(fmtCell(col, v)) + '</td>';
+      } else {
+        h += '<td>' + esc(fmtCell(col, v)) + '</td>';
+      }
+    });
+    return h + "</tr>";
+  }
+  function bindDrills() {
+    tbody.querySelectorAll("tr.drillable").forEach(tr => {
+      tr.addEventListener("click", () => send(tr.getAttribute("data-drill-q")));
+    });
+    tbody.querySelectorAll(".cell-entity").forEach(el => {
+      el.addEventListener("click", ev => { ev.stopPropagation(); send(el.getAttribute("data-entity-q")); });
+    });
+  }
+  function view() {
+    let rows = st.rows;
+    if (st.q) {
+      const q = st.q.toLowerCase();
+      rows = rows.filter(r => r.some(c => String(c).toLowerCase().indexOf(q) >= 0));
+    }
+    if (st.sort >= 0) {
+      const si = st.sort, dir = st.dir;
+      rows = rows.slice().sort((a, b) => {
+        const x = a[si], y = b[si], nx = typeof x === "number", ny = typeof y === "number";
+        if (nx && ny) return (x - y) * dir;
+        if (nx !== ny) return nx ? -dir : dir;
+        return String(x).localeCompare(String(y), undefined, { numeric: true, sensitivity: "base" }) * dir;
+      });
+    }
+    return rows;
+  }
+  function refresh() {
+    const rows = view();
+    tbody.innerHTML = rows.length ? rows.map(rowHTML).join("")
+      : '<tr class="nores"><td colspan="' + st.cols.length + '">No rows match &ldquo;' + esc(st.q) + '&rdquo;</td></tr>';
+    bindDrills();   // re-bind after every re-render so sort/filter keeps drill-down working
+    if (countEl) countEl.textContent = (st.q ? rows.length + " of " + st.rows.length + " shown" : st.count + " rows") + st.extra;
+    ths.forEach(th => {
+      const si = +th.getAttribute("data-si"), on = (si === st.sort);
+      th.classList.toggle("sorted", on);
+      th.setAttribute("aria-sort", on ? (st.dir > 0 ? "ascending" : "descending") : "none");
+      th.querySelector(".sarr").textContent = on ? (st.dir > 0 ? "▲" : "▼") : "";
+    });
+  }
+  ths.forEach(th => {
+    function toggle() {
+      const si = +th.getAttribute("data-si");
+      if (st.sort === si) {
+        if ((isNumCol(st.cols[si]) ? -1 : 1) === st.dir) { st.dir = -st.dir; }
+        else { st.sort = -1; st.dir = 1; }
+      } else { st.sort = si; st.dir = isNumCol(st.cols[si]) ? -1 : 1; }
+      refresh();
+    }
+    th.addEventListener("click", toggle);
+    th.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+  });
+  const f = card.querySelector(".tfilter");
+  if (f) f.addEventListener("input", () => { st.q = f.value.trim(); refresh(); });
+  refresh();
+}
+
 // UX niceties
 inputEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
@@ -378,7 +921,7 @@ inputEl.addEventListener("input", () => {
   inputEl.style.height = "auto";
   inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + "px";
 });
-sendEl.addEventListener("click", send);
+sendEl.addEventListener("click", () => send());   // wrap: a click event object must not become forcedText
 
 // Greeting (not sent to the flow — just shown to the user)
 addMessage("bot", CONFIG.greeting);
