@@ -30,31 +30,36 @@
   body {
     margin: 0;
     min-height: 100vh;
-    display: grid;
-    place-items: center;
-    background:
-      radial-gradient(1200px 600px at 70% -10%, #1b2a44 0%, transparent 60%),
-      radial-gradient(900px 500px at 10% 110%, #14243b 0%, transparent 55%),
-      var(--bg);
+    background: var(--bg);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: var(--ink);
-    padding: 24px;
   }
+  /* two-column shell: chat on the LEFT, report canvas on the RIGHT (report never renders in the chat) */
+  .app { display: flex; height: 100vh; overflow: hidden; }
 
   .chat {
-    width: 100%;
-    max-width: 440px;
-    height: min(720px, 88vh);
+    width: clamp(320px, 32%, 440px);
+    flex: none;
+    height: 100vh;
     background: var(--panel);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
+    border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    transition: max-width .45s cubic-bezier(.2,.7,.2,1);
   }
-  /* the chat grows once a report renders inline, so dashboards get room */
-  .chat.chat--wide { max-width: 760px; }
+
+  /* report canvas (right) — the dashboard mounts here, in its own panel */
+  .canvas { flex: 1; overflow-y: auto; padding: 24px 26px; background: #f4f7fb; }
+  .canvas .empty {
+    height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; color: var(--ink-soft); gap: 12px;
+  }
+  .canvas .empty .glyph { width: 60px; height: 60px; border-radius: 16px; background: #eaf1fe; color: var(--brand); display: grid; place-items: center; }
+  .canvas .empty h2 { margin: 0; font-size: 16px; color: var(--ink); font-weight: 700; }
+  .canvas .empty p { margin: 0; max-width: 42ch; font-size: 13.5px; line-height: 1.5; }
+  .rmount { max-width: 920px; margin: 0 auto; }
+  /* in its own panel the report card is a standalone card, not a chat bubble */
+  #report .rcard { border-bottom-left-radius: 14px; box-shadow: 0 1px 2px rgba(16,24,40,.05), 0 14px 34px -18px rgba(16,24,40,.22); }
 
   .chat__header {
     display: flex;
@@ -324,6 +329,7 @@
 </style>
 </head>
 <body>
+  <div class="app">
   <div class="chat" role="log" aria-live="polite">
     <div class="chat__header">
       <img class="chat__logo"
@@ -346,6 +352,16 @@
       </button>
     </div>
     <div class="hint"><a href="https://customtradeworkflows.com" target="_blank" rel="noopener" style="color:var(--ink-soft);text-decoration:none;">customtradeworkflows.com</a></div>
+  </div>
+
+  <div class="canvas" id="canvas">
+    <div class="empty" id="empty">
+      <div class="glyph"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19V5a2 2 0 0 1 2-2h9l5 5v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M14 3v5h5M8 13h8M8 17h5"/></svg></div>
+      <h2>Your report will appear here</h2>
+      <p>Ask about a person, vendor, client, job, or a status — the live dashboard renders right here, in its own panel, while you keep chatting on the left.</p>
+    </div>
+    <div class="rmount" id="report" style="display:none"></div>
+  </div>
   </div>
 
 <script>
@@ -567,6 +583,19 @@ function extractEnvelope(data) {
   return null;
 }
 
+// Mount the report into the RIGHT-HAND canvas — its own panel, never the chat log.
+function mountReport(node) {
+  const rep = document.getElementById("report");
+  if (!rep) return;
+  rep.innerHTML = "";
+  rep.appendChild(node);
+  rep.style.display = "";
+  const empty = document.getElementById("empty");
+  if (empty) empty.style.display = "none";
+  const cv = document.getElementById("canvas");
+  if (cv) cv.scrollTop = 0;
+}
+
 function tryRenderEnvelope(data) {
   try {
     const env = extractEnvelope(data);
@@ -574,23 +603,14 @@ function tryRenderEnvelope(data) {
     if (env.ambiguous) {   // "which one?" picker — tap a candidate to ask for it
       const pick = renderCandidateCard(env);
       if (!pick) return;
-      const pwrap = document.createElement("div");
-      pwrap.className = "msg msg--bot msg--report";
-      pwrap.appendChild(pick);
-      logEl.appendChild(pwrap);
-      requestAnimationFrame(() => { logEl.scrollTop = logEl.scrollHeight; });
+      mountReport(pick);
       return;
     }
     if (env.ok !== true) return;
     const card = renderEnvelopeCard(env);
     if (!card) return;
-    const wrap = document.createElement("div");
-    wrap.className = "msg msg--bot msg--report";
-    wrap.appendChild(card);
-    logEl.appendChild(wrap);
-    document.querySelector(".chat").classList.add("chat--wide");
-    requestAnimationFrame(() => { logEl.scrollTop = logEl.scrollHeight; });
-  } catch (e) { /* inline preview is best-effort; chat behavior unchanged */ }
+    mountReport(card);   // renders in the right panel, NOT in the chat
+  } catch (e) { /* report render is best-effort; chat behavior unchanged */ }
 }
 
 function renderCandidateCard(env) {
@@ -741,11 +761,12 @@ function buildBarCharts(env) {
 }
 
 function wireKpis(card) {
+  const animate = !REDUCE && !document.hidden;   // hidden/background tabs pause rAF — show final value instead
   card.querySelectorAll(".rkpi .val").forEach(node => {
     const target = parseFloat(node.getAttribute("data-target")) || 0;
     const key = node.getAttribute("data-key");
     if (node.textContent !== "0") return;   // non-numeric metric, left as-is
-    if (REDUCE) { node.textContent = fmtMetric(key, target); return; }
+    if (!animate) { node.textContent = fmtMetric(key, target); return; }
     const dur = 800; let t0 = null;
     function step(ts) {
       if (!t0) t0 = ts;
@@ -758,9 +779,10 @@ function wireKpis(card) {
 }
 
 function wireBars(card) {
-  requestAnimationFrame(() => setTimeout(() => {
+  // setTimeout (not rAF) so bars fill even in a hidden/background tab; the CSS transition animates them when visible
+  setTimeout(() => {
     card.querySelectorAll(".fill").forEach(f => { f.style.width = f.getAttribute("data-w") + "%"; });
-  }, 120));
+  }, REDUCE ? 0 : 60);
 }
 
 function wireTrends(card, trends) {
