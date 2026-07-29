@@ -331,6 +331,159 @@
   .tsearch input { border: none; outline: none; background: transparent; font: inherit; font-size: 12px; color: var(--ink); width: 110px; }
   .tsearch input::placeholder { color: var(--ink-soft); }
 
+  /* ---------- report toolbar (screen only) ---------- */
+  .rtools { display: none; max-width: 920px; margin: 0 auto 12px; justify-content: flex-end; gap: 8px; }
+  .rtools.on { display: flex; }
+  .tbtn {
+    display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 13px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink-soft); border-radius: 10px;
+    font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .tbtn:hover { border-color: var(--brand); color: var(--brand); }
+  .tbtn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  .tbtn[aria-pressed="true"] { border-color: var(--brand); color: var(--brand-deep); background: #eef3fe; }
+  .tbtn svg { width: 16px; height: 16px; flex: none; }
+
+  /* ---------- the print frame ----------
+     A real <table> whose <thead> carries the letterhead, because a browser
+     repeats a real thead at the top of every printed page. On screen it is
+     neutralised back to plain blocks, so the live layout is unchanged. */
+  .pframe { display: block; width: 100%; border-collapse: collapse; }
+  .pframe > thead { display: none; }
+  .pframe > tbody, .pframe > tbody > tr, .pframe > tbody > tr > td { display: block; padding: 0; }
+
+  .printhead { display: none; }
+  .printhead .ph-inner { display: flex; align-items: center; gap: 14px; }
+  .printhead .ph-logo { height: 40px; width: auto; max-width: 190px; object-fit: contain; flex: none; }
+  .printhead .ph-name { font-size: 16px; font-weight: 800; letter-spacing: -.01em; line-height: 1.2; }
+  .printhead .ph-meta { font-size: 10.5px; color: var(--ink-soft); margin-top: 3px; }
+
+  /* ============================================================
+     DATA SOURCE PROVENANCE
+     Every field carries data-src at render time; none of it paints
+     until body.srcon is set, so the toggle costs nothing when off.
+       hours     Timesheet sheet        green
+       projects  Projects/contract      blue
+       costs     Costs/material         red
+       calc      derived from >1 sheet  slate
+     ============================================================ */
+  [data-src="hours"]    { --src-c: #15803D; --src-bg: rgba(22,163,74,.085);  --src-bg2: rgba(22,163,74,.18); }
+  [data-src="projects"] { --src-c: #1b4db3; --src-bg: rgba(47,109,246,.075); --src-bg2: rgba(47,109,246,.17); }
+  [data-src="costs"]    { --src-c: #B91C1C; --src-bg: rgba(220,38,38,.07);   --src-bg2: rgba(220,38,38,.16); }
+  [data-src="calc"]     { --src-c: #475569; --src-bg: rgba(100,116,139,.08); --src-bg2: rgba(100,116,139,.17); }
+  [data-src="none"]     { --src-c: #7c8798; --src-bg: rgba(148,163,184,.07); --src-bg2: rgba(148,163,184,.15); }
+
+  .srclab { display: none; }
+  body.srcon .srclab {
+    display: inline-block; margin-left: 6px; padding: 1px 5px; border-radius: 4px;
+    font-size: 8.5px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--src-c); background: var(--src-bg2); vertical-align: 1px; white-space: nowrap;
+  }
+  body.srcon .rcard thead th[data-src] { background: var(--src-bg2) !important; border-bottom: 2px solid var(--src-c); color: var(--ink); }
+  body.srcon .rcard tbody td[data-src] { background: var(--src-bg); }
+  body.srcon .rcard .rkpi[data-src] { background: var(--src-bg); border-color: var(--src-c); box-shadow: inset 3px 0 0 var(--src-c); }
+  body.srcon .rcard .rkpi[data-src] .lab { color: var(--src-c); }
+  body.srcon .rcard .rkpi > .srclab { margin: 5px 0 0; }
+  body.srcon .rcard .rchart[data-src], body.srcon .rcard .rtrend[data-src] { background: var(--src-bg); border-color: var(--src-c); }
+  body.srcon .rcard .rsec > h4 .srclab { vertical-align: 0; }
+
+  .srclegend {
+    display: none; max-width: 920px; margin: 0 auto 12px; align-items: center; flex-wrap: wrap; gap: 7px 16px;
+    background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px 13px;
+    font-size: 11.5px; color: var(--ink-soft);
+  }
+  body.srcon .srclegend { display: flex; }
+  .srclegend .sl-title { font-weight: 800; color: var(--ink); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+  .srclegend .sl-item { display: inline-flex; align-items: center; gap: 6px; font-weight: 650; color: var(--ink); }
+  .srclegend .sl-item i { width: 11px; height: 11px; border-radius: 3px; background: var(--src-c); border: 1px solid rgba(0,0,0,.08); flex: none; }
+  .srclegend .sl-note { flex-basis: 100%; font-size: 11px; font-weight: 400; color: var(--ink-soft); margin: 0; }
+
+  /* ============================================================
+     PRINT — the chat column drops away and the report in the right
+     panel becomes the page.
+
+     The letterhead rides in the print frame's <thead>, so the browser
+     repeats it at the top of every page — the same mechanism that
+     repeats a data table's header row. position:fixed is the more
+     obvious trick and it is subtly wrong: Chrome paints a fixed element
+     on every page EXCEPT the last one. Measured, not assumed.
+
+     Everything mouse-only is stripped; everything mid-animation is
+     finished by finalizeForPrint().
+     ============================================================ */
+  @media print {
+    @page { size: letter; margin: .5in; }
+
+    html, body { background: #fff !important; height: auto !important; min-height: 0 !important; overflow: visible !important; }
+    body { font-size: 11px; color: #000; }
+
+    /* unlock the 100vh flex shell so content can flow onto page 2, 3, ... */
+    .app    { display: block !important; height: auto !important; overflow: visible !important; }
+    .chat   { display: none !important; }
+    .canvas { display: block !important; flex: none !important; height: auto !important; overflow: visible !important; padding: 0 !important; background: #fff !important; }
+    .rmount { max-width: none !important; margin: 0 !important; }
+    .rtools, #empty { display: none !important; }
+
+    /* the running letterhead — repeated at the top of every printed page */
+    .pframe { display: table !important; width: 100% !important; }
+    .pframe > thead { display: table-header-group !important; }
+    .pframe > tbody { display: table-row-group !important; }
+    .pframe > tbody > tr { display: table-row !important; }
+    .pframe > tbody > tr > td { display: table-cell !important; padding: 0 !important; }
+    .printhead { display: block !important; }
+    .printhead .ph-inner {
+      display: flex !important; align-items: center; gap: 14px;
+      padding: 0 0 7px; margin: 0 0 13px;
+      border-bottom: 2px solid #1f2733;
+    }
+    .printhead .ph-logo { height: 36px; }
+
+    .srclegend { max-width: none !important; margin: 0 0 12px !important; break-inside: avoid; }
+
+    /* status pills, bar fills, the hero KPI tint and every source colour are
+       the report's only encoding of meaning — force them onto paper */
+    .canvas, .canvas * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+    .rcard { border: none !important; border-radius: 0 !important; box-shadow: none !important; padding: 0 !important; animation: none !important; gap: 13px !important; }
+
+    /* the table is clipped to 340px and scrolls on screen — unclip it, and
+       repeat its header row at the top of every page it spills onto */
+    .rtablewrap { overflow: visible !important; border-color: #d5dbe6 !important; }
+    .rtscroll   { max-height: none !important; overflow: visible !important; }
+    .rcard table    { page-break-inside: auto; width: 100% !important; table-layout: auto; font-size: 9.8px; }
+    .rcard thead    { display: table-header-group; }
+    /* a wide table must fold onto the page, never run off its right edge —
+       so the header stops being nowrap and long values may wrap */
+    .rcard thead th { position: static !important; white-space: normal !important; padding: 6px 6px !important; border-bottom: 1px solid #c9d2e0 !important; }
+    .rcard thead th:not([data-src]) { background: #f3f5f9 !important; }
+    .rcard tbody td { padding: 5px 6px !important; }
+    .rcard th, .rcard td { overflow-wrap: break-word; }
+    body.srcon .rcard thead th .srclab { display: block !important; margin: 3px 0 0 !important; }
+    .rcard tbody tr { page-break-inside: avoid; break-inside: avoid; }
+    .rcard tbody tr:hover { background: none !important; }
+
+    /* never split a KPI tile, a chart or a trend across a page break */
+    .rkpis, .rkpi, .rchart, .rtrend, .rcharts > * { break-inside: avoid; page-break-inside: avoid; }
+    .rsec > h4 { break-after: avoid; page-break-after: avoid; }
+
+    /* finished state for anything that animates in */
+    .rtrend .tline { stroke-dasharray: none !important; stroke-dashoffset: 0 !important; transition: none !important; }
+    .rtrend svg path[fill^="url"] { opacity: 1 !important; transition: none !important; }
+    .rtrend .tguide { opacity: 0 !important; }
+    .bar-row .fill { transition: none !important; }
+
+    /* strip the mouse-only furniture */
+    .tsearch, .ttip, .rdrill, .rcand, .sarr, .rcard thead th .sarr { display: none !important; }
+    .rsec > h4 .agg:not(.tcount) { display: none !important; }
+    .rcard .cell-entity, .rcard .cell-value {
+      color: inherit !important; text-decoration: none !important; background: none !important;
+      padding: 0 !important; margin: 0 !important; cursor: auto !important;
+    }
+    .rcard .rkpi.drillable, .rcard .bar-row.drillable, .rcard tbody tr.drillable { cursor: auto !important; }
+    .rcard tbody tr.drillable:hover td:first-child::before { display: none !important; }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .rcard { animation: none; }
     .bar-row .fill { transition: none !important; }
@@ -370,7 +523,45 @@
       <h2>Your report will appear here</h2>
       <p>Ask about a person, vendor, client, job, or a status — the live dashboard renders right here, in its own panel, while you keep chatting on the left.</p>
     </div>
+    <div class="rtools" id="rtools">
+      <button type="button" class="tbtn" id="srcBtn" aria-pressed="false" title="Colour every field by the sheet it comes from">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 2 9 5-9 5-9-5 9-5z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg>Data sources
+      </button>
+      <button type="button" class="tbtn" id="printBtn" title="Print this report, or save it as a PDF">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print / PDF
+      </button>
+    </div>
+
+    <table class="pframe">
+      <thead><tr><td>
+        <div class="printhead" id="printhead">
+          <div class="ph-inner">
+            <img class="ph-logo"
+                 src="https://img1.wsimg.com/isteam/ip/13a3286d-c16f-45d3-b860-bf992e4c1238/Custom%20Trade%20Workflows.png"
+                 alt="Custom Trade Workflows"
+                 onerror="this.style.display='none'" />
+            <div>
+              <div class="ph-name" id="phName">Report</div>
+              <div class="ph-meta" id="phMeta"></div>
+            </div>
+          </div>
+        </div>
+      </td></tr></thead>
+      <tbody><tr><td>
+
+        <div class="srclegend" id="srclegend">
+          <span class="sl-title">Where this data comes from</span>
+          <span class="sl-item" data-src="hours"><i></i>Timesheet</span>
+          <span class="sl-item" data-src="projects"><i></i>Contract</span>
+          <span class="sl-item" data-src="costs"><i></i>Material cost</span>
+          <span class="sl-item" data-src="calc"><i></i>Calculated</span>
+          <p class="sl-note">Calculated fields (margin, total cost, budget variance) are worked out from more than one sheet, so they get their own colour rather than borrowing one.</p>
+        </div>
+
     <div class="rmount" id="report" style="display:none"></div>
+
+      </td></tr></tbody>
+    </table>
   </div>
   </div>
 
@@ -638,6 +829,81 @@ const KPI_QUERIES = {
 // row key whose contents are already fully on screen.
 const NO_DRILL = { description:1, notes:1, costid:1, entryid:1, clientid:1, employeeid:1 };
 
+/* ============================================================
+   FIELD PROVENANCE — which sheet each field actually comes from.
+   Keys are the data dictionary's 41 columns plus the 8 derived
+   measures, normalised to lowercase alphanumerics, plus the
+   aliases the engine emits. Rendered as data-src on every th, td,
+   KPI tile and chart; invisible until the Data sources toggle.
+   ============================================================ */
+const SRC_META = {
+  hours:    { label: "Timesheet" },
+  projects: { label: "Contract" },
+  costs:    { label: "Material cost" },
+  calc:     { label: "Calculated" },
+  none:     { label: "Unmapped" }
+};
+
+const FIELD_SOURCE = {
+  // ---- Hours sheet · timesheet · green ----
+  date:"hours", employeeid:"hours", employeename:"hours", employee:"hours", hourlyrate:"hours",
+  hoursworked:"hours", overtimeflag:"hours", role:"hours", taskcode:"hours", task:"hours",
+  entryid:"hours", notes:"hours",
+  // derived, but every input is a timesheet row
+  laborhours:"hours", laborcost:"hours", overtimehours:"hours", hours:"hours",
+
+  // ---- Projects sheet · contract · blue ----
+  address:"projects", budgetedhours:"projects", budgetedmaterialcost:"projects", city:"projects",
+  clientid:"projects", clientname:"projects", client:"projects", contractvalue:"projects",
+  crewlead:"projects", enddate:"projects", permitnumber:"projects", prioritylevel:"projects",
+  priority:"projects", projectid:"projects", project:"projects", projectmanager:"projects",
+  projectname:"projects", projecttype:"projects", type:"projects", safetyincidentflag:"projects",
+  startdate:"projects", state:"projects", status:"projects", location:"projects",
+
+  // ---- Costs sheet · material cost · red ----
+  amount:"costs", costcategory:"costs", category:"costs", costid:"costs", dateincurred:"costs",
+  description:"costs", invoicenumber:"costs", paymentstatus:"costs", vendorname:"costs", vendor:"costs",
+  spend:"costs",
+
+  // ---- derived from more than one sheet · slate ----
+  totalcost:"calc", margin:"calc", marginpct:"calc", marginhealth:"calc",
+  budgetvariance:"calc", variance:"calc"
+};
+
+// ApprovedBy exists on BOTH Hours and Costs — resolved from the table it sits in.
+const AMBIGUOUS_FIELDS = { approvedby: 1 };
+
+function srcKey(name) { return String(name == null ? "" : name).toLowerCase().replace(/[^a-z0-9]/g, ""); }
+
+function sourceOf(name) {
+  const k = srcKey(name);
+  if (!k) return "none";
+  if (FIELD_SOURCE[k]) return FIELD_SOURCE[k];
+  // fallback so a column or metric I have never seen still gets classified
+  if (/hour|timesheet|shift|clock|overtime|crewday/.test(k)) return "hours";
+  if (/margin|variance|profit|netto|total/.test(k)) return "calc";
+  if (/vendor|invoice|material|purchase|payment|paid|overdue|spend|expense|cost|amount/.test(k)) return "costs";
+  if (/project|contract|client|job|permit|budget|schedule|start|end|city|state|address|status|priority|safety/.test(k)) return "projects";
+  return "none";
+}
+
+// Resolve a whole column list at once so ambiguous columns inherit the
+// dominant source of the table they appear in.
+function colSources(cols) {
+  const raw = (cols || []).map(c => AMBIGUOUS_FIELDS[srcKey(c)] ? null : sourceOf(c));
+  const tally = {};
+  raw.forEach(s => { if (s && s !== "none" && s !== "calc") tally[s] = (tally[s] || 0) + 1; });
+  let dom = "none", best = 0;
+  for (const k in tally) { if (tally[k] > best) { best = tally[k]; dom = k; } }
+  return raw.map(s => s || dom);
+}
+
+function srcAttr(src) { return ' data-src="' + (src || "none") + '"'; }
+function srcLab(src) {
+  const m = SRC_META[src] || SRC_META.none;
+  return '<span class="srclab">' + esc(m.label) + '</span>';
+}
+
 function cellQuery(col, v, pid) {
   const lc = String(col).toLowerCase();
   if (NO_DRILL[lc]) return null;
@@ -687,7 +953,7 @@ function extractEnvelope(data) {
 }
 
 // Mount the report into the RIGHT-HAND canvas — its own panel, never the chat log.
-function mountReport(node) {
+function mountReport(node, printTitle) {
   const rep = document.getElementById("report");
   if (!rep) return;
   rep.innerHTML = "";
@@ -697,7 +963,86 @@ function mountReport(node) {
   if (empty) empty.style.display = "none";
   const cv = document.getElementById("canvas");
   if (cv) cv.scrollTop = 0;
+  setPrintable(printTitle);
 }
+
+/* ============================================================
+   TOOLBAR — printTitle == null means this is not a printable
+   report (the "which one do you mean?" picker), so the toolbar
+   and the letterhead stay hidden.
+   ============================================================ */
+function setPrintable(printTitle) {
+  const tools = document.getElementById("rtools");
+  const on = !!printTitle;
+  if (tools) tools.classList.toggle("on", on);
+  document.body.classList.toggle("hasreport", on);
+  if (!on) return;
+  const nameEl = document.getElementById("phName");
+  const metaEl = document.getElementById("phMeta");
+  if (nameEl) nameEl.textContent = printTitle;
+  if (metaEl) {
+    let stamp;
+    try {
+      stamp = new Date().toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    } catch (e) { stamp = new Date().toString(); }
+    metaEl.textContent = "Generated " + stamp + "  \u00b7  customtradeworkflows.com";
+  }
+  try { document.title = printTitle + " \u2014 Report"; } catch (e) {}
+}
+
+/* Finish every animation before the print snapshot is taken. Without this,
+   printing during the 800ms KPI count-up or the 900ms trend draw puts
+   half-drawn numbers and a half-drawn line on paper. */
+function finalizeForPrint() {
+  const rep = document.getElementById("report");
+  if (!rep) return;
+  rep.querySelectorAll(".rkpi .val").forEach(node => {
+    const key = node.getAttribute("data-key");
+    const target = parseFloat(node.getAttribute("data-target"));
+    // target 0 also means "non-numeric metric, rendered as text" — leave those
+    if (key !== null && isFinite(target) && target !== 0) node.textContent = fmtMetric(key, target);
+  });
+  rep.querySelectorAll(".fill").forEach(f => {
+    const w = f.getAttribute("data-w");
+    if (w !== null) { f.style.transition = "none"; f.style.width = w + "%"; }
+  });
+  rep.querySelectorAll(".rtrend .tline").forEach(l => {
+    l.style.transition = "none"; l.style.strokeDasharray = "none"; l.style.strokeDashoffset = "0";
+  });
+  rep.querySelectorAll('.rtrend svg path[fill^="url"]').forEach(p => {
+    p.style.transition = "none"; p.style.opacity = "1";
+  });
+  rep.querySelectorAll(".ttip").forEach(t => { t.style.opacity = "0"; });
+}
+
+function doPrint() {
+  finalizeForPrint();
+  // two frames so the forced styles are laid out before the snapshot
+  requestAnimationFrame(() => requestAnimationFrame(() => { try { window.print(); } catch (e) {} }));
+}
+
+function toggleSources(force) {
+  const on = (force === undefined) ? !document.body.classList.contains("srcon") : !!force;
+  document.body.classList.toggle("srcon", on);
+  const btn = document.getElementById("srcBtn");
+  if (btn) btn.setAttribute("aria-pressed", on ? "true" : "false");
+  return on;
+}
+
+(function wireTools() {
+  const p = document.getElementById("printBtn");
+  if (p) p.addEventListener("click", doPrint);
+  const s = document.getElementById("srcBtn");
+  if (s) s.addEventListener("click", () => toggleSources());
+  // Ctrl/Cmd+P and the browser menu bypass the button — catch those too
+  window.addEventListener("beforeprint", finalizeForPrint);
+  if (window.matchMedia) {
+    const mq = window.matchMedia("print");
+    const onChange = e => { if (e.matches) finalizeForPrint(); };
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+  }
+})();
 
 function tryRenderEnvelope(data) {
   try {
@@ -706,13 +1051,13 @@ function tryRenderEnvelope(data) {
     if (env.ambiguous) {   // "which one?" picker — tap a candidate to ask for it
       const pick = renderCandidateCard(env);
       if (!pick) return;
-      mountReport(pick);
+      mountReport(pick, null);   // an ambiguity picker is not a printable report
       return;
     }
     if (env.ok !== true) return;
     const card = renderEnvelopeCard(env);
     if (!card) return;
-    mountReport(card);   // renders in the right panel, NOT in the chat
+    mountReport(card, env.resolvedEntity || (env.entityType ? titleCase(env.entityType) + " report" : "Report"));   // renders in the right panel, NOT in the chat
   } catch (e) { /* report render is best-effort; chat behavior unchanged */ }
 }
 
@@ -759,7 +1104,8 @@ function renderEnvelopeCard(env) {
     mkeys.slice(0, 6).forEach(k => {
       const kq = KPI_QUERIES[k] ? KPI_QUERIES[k](env.resolvedEntity) : null;
       const ka = kq ? ' data-kpi-q="' + esc(kq) + '" title="' + esc(kq) + '" tabindex="0" role="button"' : "";
-      html += '<div class="rkpi' + (k === heroKey ? " hero" : "") + (kq ? " drillable" : "") + '"' + ka + '><div class="lab" title="' + esc(prettify(k)) + '">' + esc(prettify(k)) + '</div><div class="val" data-target="' + (typeof metrics[k] === "number" ? metrics[k] : 0) + '" data-key="' + esc(k) + '">' + esc(typeof metrics[k] === "number" ? "0" : String(metrics[k])) + '</div></div>';
+      const ks = sourceOf(k);
+      html += '<div class="rkpi' + (k === heroKey ? " hero" : "") + (kq ? " drillable" : "") + '"' + ka + srcAttr(ks) + '><div class="lab" title="' + esc(prettify(k)) + '">' + esc(prettify(k)) + '</div><div class="val" data-target="' + (typeof metrics[k] === "number" ? metrics[k] : 0) + '" data-key="' + esc(k) + '">' + esc(typeof metrics[k] === "number" ? "0" : String(metrics[k])) + '</div>' + srcLab(ks) + '</div>';
     });
     html += '</div>';
   }
@@ -770,7 +1116,8 @@ function renderEnvelopeCard(env) {
     const hasStatusDrill = charts.some(c => c.drill === "status");
     html += '<div class="rsec"><h4>Breakdown<span class="rule"></span>' + (hasStatusDrill ? '<span class="agg">click a status to see those jobs</span>' : '') + '</h4><div class="rcharts">';
     charts.forEach((c, ci) => {
-      html += '<div class="rchart"><h5>' + esc(c.title) + '</h5><div class="rbars" data-bars="' + ci + '">';
+      const cs = sourceOf(c.title.replace(/^(by|hours by|spend by)\s+/i, ""));
+      html += '<div class="rchart"' + srcAttr(cs) + '><h5>' + esc(c.title) + srcLab(cs) + '</h5><div class="rbars" data-bars="' + ci + '">';
       c.data.forEach(r => {
         const val = (typeof r[1] === "number" && r[1] % 1) ? r[1].toFixed(1) : r[1];
         const rowAttr = (c.drill === "status")
@@ -789,7 +1136,8 @@ function renderEnvelopeCard(env) {
     html += '<div class="rsec"><h4>Monthly trend<span class="rule"></span><span class="agg">hover for detail</span></h4><div class="rcharts">';
     trends.forEach((t, ti) => {
       let tot = 0; t.points.forEach(p => { tot += Number(p[1]) || 0; });
-      html += '<div class="rtrend" data-trend="' + ti + '"><h5>' + esc(t.label || "Trend") + '<span class="tsum">' + esc(fmtTrendVal(t, tot)) + ' total</span></h5><svg viewBox="0 0 520 170" role="img" aria-label="' + esc(t.label || "Trend") + '"></svg><div class="ttip"></div></div>';
+      const ts = t.unit === "hours" ? "hours" : sourceOf(t.label || "");
+      html += '<div class="rtrend" data-trend="' + ti + '"' + srcAttr(ts) + '><h5>' + esc(t.label || "Trend") + srcLab(ts) + '<span class="tsum">' + esc(fmtTrendVal(t, tot)) + ' total</span></h5><svg viewBox="0 0 520 170" role="img" aria-label="' + esc(t.label || "Trend") + '"></svg><div class="ttip"></div></div>';
     });
     html += '</div></div>';
   }
@@ -803,8 +1151,11 @@ function renderEnvelopeCard(env) {
       '<label class="tsearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>' +
       '<input type="text" class="tfilter" placeholder="Filter rows&hellip;" aria-label="Filter table rows" autocomplete="off"></label>' +
       '<span class="agg tcount"></span></h4><div class="rtablewrap"><div class="rtscroll"><table><thead><tr>';
+    const thSrc = colSources(tbl.columns);
     tbl.columns.forEach((col, ci) => {
-      html += '<th class="sortable' + (isNumCol(col) ? " num" : "") + '" data-si="' + ci + '" tabindex="0" role="button" title="Sort by ' + esc(col) + '">' + esc(col) + '<span class="sarr"></span></th>';
+      html += '<th class="sortable' + (isNumCol(col) ? " num" : "") + '" data-si="' + ci + '"' + srcAttr(thSrc[ci]) +
+              ' tabindex="0" role="button" title="Sort by ' + esc(col) + ' \u00b7 from the ' + esc((SRC_META[thSrc[ci]] || SRC_META.none).label) + ' data">' +
+              esc(col) + srcLab(thSrc[ci]) + '<span class="sarr"></span></th>';
     });
     html += '</tr></thead><tbody></tbody></table></div></div>';
     const canDrill = tbl.columns.indexOf("ProjectID") >= 0;
@@ -997,6 +1348,7 @@ function wireTable(card, tbl) {
   const countEl = card.querySelector(".tcount");
   const ths = card.querySelectorAll("th.sortable");
 
+  const tdSrc = colSources(st.cols);
   function rowHTML(r) {
     const drillAttr = (st.idIdx >= 0 && r[st.idIdx] != null && r[st.idIdx] !== "")
       ? ' class="drillable" data-drill-q="' + esc(projectQuery(r[st.idIdx])) + '" title="Open this job"'
@@ -1008,17 +1360,18 @@ function wireTable(card, tbl) {
       const pid = (st.idIdx >= 0) ? r[st.idIdx] : null;
       const cq  = cellQuery(col, v, pid);
       const cqa = cq ? ' data-value-q="' + esc(cq) + '" title="' + esc(cq) + '" tabindex="0" role="button"' : "";
+      const sa  = srcAttr(tdSrc[ci]);
       if (lc === "status") {
         const c = statusColor(v);
-        h += '<td><span class="rpill' + (cq ? " cell-value" : "") + '"' + cqa + ' style="color:' + c + ';background:' + c + '26">' + esc(v) + '</span></td>';
+        h += '<td' + sa + '><span class="rpill' + (cq ? " cell-value" : "") + '"' + cqa + ' style="color:' + c + ';background:' + c + '26">' + esc(v) + '</span></td>';
       } else if (lc.indexOf("id") >= 0 && ci === 0) {
-        h += '<td class="mono">#' + esc(v) + '</td>';
+        h += '<td class="mono"' + sa + '>#' + esc(v) + '</td>';
       } else if (ENTITY_COLS[lc] && v && typeof v === "string") {
-        h += '<td><span class="cell-entity" data-entity-q="' + esc(entityQuery(v)) + '" title="Ask about ' + esc(v) + '">' + esc(v) + '</span></td>';
+        h += '<td' + sa + '><span class="cell-entity" data-entity-q="' + esc(entityQuery(v)) + '" title="Ask about ' + esc(v) + '">' + esc(v) + '</span></td>';
       } else if (isNumCol(col)) {
-        h += '<td class="num">' + (cq ? '<span class="cell-value"' + cqa + '>' + esc(fmtCell(col, v)) + '</span>' : esc(fmtCell(col, v))) + '</td>';
+        h += '<td class="num"' + sa + '>' + (cq ? '<span class="cell-value"' + cqa + '>' + esc(fmtCell(col, v)) + '</span>' : esc(fmtCell(col, v))) + '</td>';
       } else {
-        h += '<td>' + (cq ? '<span class="cell-value"' + cqa + '>' + esc(fmtCell(col, v)) + '</span>' : esc(fmtCell(col, v))) + '</td>';
+        h += '<td' + sa + '>' + (cq ? '<span class="cell-value"' + cqa + '>' + esc(fmtCell(col, v)) + '</span>' : esc(fmtCell(col, v))) + '</td>';
       }
     });
     return h + "</tr>";
