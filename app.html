@@ -290,6 +290,16 @@
   .rcard tbody tr.drillable:hover td:first-child::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brand); }
   .rcard .cell-entity { cursor: pointer; color: var(--brand); text-decoration: underline; text-decoration-style: dotted; text-underline-offset: 2px; }
   .rcard .cell-entity:hover { text-decoration-style: solid; }
+  /* every other mapped field: a value you can ask about */
+  .rcard .cell-value { cursor: pointer; border-radius: 5px; padding: 1px 4px; margin: -1px -4px;
+    text-decoration: underline; text-decoration-style: dotted; text-decoration-color: color-mix(in srgb, var(--brand) 45%, transparent);
+    text-underline-offset: 2px; transition: background .12s, color .12s; }
+  .rcard .cell-value:hover { background: #eef3fe; color: var(--brand-deep); text-decoration-style: solid; }
+  .rcard .cell-value:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+  .rcard .rpill.cell-value:hover { filter: brightness(.94); }
+  .rcard .rkpi.drillable { cursor: pointer; transition: border-color .12s, background .12s; }
+  .rcard .rkpi.drillable:hover { border-color: var(--brand); background: #eef3fe; }
+  .rcard .rkpi.drillable:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
   /* status-bar drill: click a "By status" bar to ask for those jobs */
   .rcard .bar-row.drillable { cursor: pointer; border-radius: 8px; padding: 3px 5px; margin: -3px -5px; transition: background .12s; }
   .rcard .bar-row.drillable:hover { background: #eef3fe; }
@@ -545,6 +555,99 @@ let trendUid = 0;
 
 function projectQuery(id){ return "Show me project " + id; }
 function entityQuery(name){ return "Show me " + name; }
+
+/* ============================================================
+   FULL-COVERAGE DRILL (additive)
+
+   Every field the engine can return now composes a plain-English
+   follow-up, using the same send() round-trip the page already
+   uses for rows, entity names and status bars. Nothing here
+   bypasses the chat — a drill is just another question.
+
+   Two lookups:
+     VALUE_COLS   a cell whose VALUE defines a cohort  ("Tacoma" -> jobs there)
+     MEASURE_COLS a number that belongs to a job       (a margin -> that job's margin)
+   Anything in neither renders exactly as it does today.
+   ============================================================ */
+const VALUE_COLS = {
+  status:          v => "Show me " + String(v).toLowerCase() + " jobs",
+  projecttype:     v => "Show me " + v + " jobs",
+  type:            v => "Show me " + v + " jobs",
+  prioritylevel:   v => "Show me " + String(v).toLowerCase() + " priority jobs",
+  priority:        v => "Show me " + String(v).toLowerCase() + " priority jobs",
+  city:            v => "Show me jobs in " + v,
+  state:           v => "Show me jobs in " + v,
+  location:        v => "Show me jobs in " + String(v).split(",")[0].trim(),
+  costcategory:    v => "Show me " + String(v).toLowerCase() + " costs",
+  category:        v => "Show me " + String(v).toLowerCase() + " costs",
+  paymentstatus:   v => "Show me " + String(v).toLowerCase() + " invoices",
+  role:            v => "Show me " + String(v).toLowerCase() + " hours",
+  taskcode:        v => "Show me " + String(v).toLowerCase() + " work",
+  task:            v => "Show me " + String(v).toLowerCase() + " work",
+  permitnumber:    v => "Show me permit " + v,
+  invoicenumber:   v => "Show me invoice " + v,
+  date:            v => "Show me what happened on " + v,
+  dateincurred:    v => "Show me what was incurred on " + v,
+  startdate:       (v, pid) => pid ? "Show me the schedule for project " + pid : null,
+  enddate:         (v, pid) => pid ? "Show me the schedule for project " + pid : null,
+  safetyincidentflag: v => /^(true|yes|1)$/i.test(String(v)) ? "Show me jobs with safety incidents" : null,
+  overtimeflag:    v => /^(true|yes|1)$/i.test(String(v)) ? "Show me overtime" : null
+};
+
+const MEASURE_COLS = {
+  contractvalue:        pid => "Show me the contract on project " + pid,
+  totalcost:            pid => "Show me the cost breakdown for project " + pid,
+  costsTotal:           pid => "Show me the cost breakdown for project " + pid,
+  amount:               pid => "Show me the cost breakdown for project " + pid,
+  amounttoproject:      pid => "Show me the cost breakdown for project " + pid,
+  matchingcostamount:   pid => "Show me the cost breakdown for project " + pid,
+  margin:               pid => "Show me the margin on project " + pid,
+  marginpct:            pid => "Show me the margin on project " + pid,
+  variance:             pid => "Show me budget vs actual for project " + pid,
+  budgetedhours:        pid => "Show me budget vs actual for project " + pid,
+  budgetedmaterialcost: pid => "Show me budget vs actual for project " + pid,
+  hoursworked:          pid => "Show me the hours on project " + pid,
+  laborhours:           pid => "Show me the hours on project " + pid,
+  laborcost:            pid => "Show me the labor cost on project " + pid,
+  hourlyrate:           pid => "Show me the labor cost on project " + pid
+};
+
+// KPI tiles: the headline number becomes a question about the thing it counts.
+const KPI_QUERIES = {
+  projectsManaged:       e => e ? "Show me " + e + "'s projects" : "Show me every project",
+  activeProjectsManaged: e => e ? "Show me " + e + "'s active jobs" : "Show me active jobs",
+  contractValueManaged:  e => e ? "Show me " + e + "'s projects" : null,
+  projectsLed:           e => e ? "Show me the jobs " + e + " leads" : null,
+  hoursWorked:           e => e ? "Show me " + e + "'s hours" : "Show me hours",
+  overtimeHours:         e => e ? "Show me " + e + "'s overtime" : "Show me overtime",
+  costsApprovedCount:    e => e ? "Show me the costs " + e + " approved" : null,
+  costsApprovedAmount:   e => e ? "Show me the costs " + e + " approved" : null,
+  totalSpend:            e => e ? "Show me " + e + "'s cost lines" : null,
+  overdueAmount:         ( ) => "Show me overdue invoices",
+  pendingAmount:         ( ) => "Show me pending invoices",
+  paidAmount:            ( ) => "Show me paid invoices",
+  projectsServed:        e => e ? "Show me the projects " + e + " served" : null,
+  projectCount:          e => e ? "Show me " + e + "'s projects" : null,
+  totalContractValue:    e => e ? "Show me " + e + "'s projects" : null,
+  activeCount:           e => e ? "Show me " + e + "'s active jobs" : "Show me active jobs",
+  matchCount:            ( ) => null,
+  actualCostToDate:      e => e ? "Show me " + e + "'s costs" : null
+};
+
+// Columns a report should never turn into a question: free text, or an opaque
+// row key whose contents are already fully on screen.
+const NO_DRILL = { description:1, notes:1, costid:1, entryid:1, clientid:1, employeeid:1 };
+
+function cellQuery(col, v, pid) {
+  const lc = String(col).toLowerCase();
+  if (NO_DRILL[lc]) return null;
+  if (v === null || v === undefined || v === "") return null;
+  const vc = VALUE_COLS[lc];
+  if (vc) { try { return vc(v, pid) || null; } catch (e) { return null; } }
+  const mc = MEASURE_COLS[lc];
+  if (mc && pid != null && pid !== "") { try { return mc(pid) || null; } catch (e) { return null; } }
+  return null;
+}
 // same semantics as app.html's candidate drill
 function candQuery(c){ if (c.entityType === "project") return "Show me project " + c.entityValue; return "Show me " + (c.entityValue || c.label); }
 // same semantics as app.html's donut-legend drill: scope to the person when we can
@@ -654,7 +757,9 @@ function renderEnvelopeCard(env) {
     for (const k of mkeys) { if (isMoneyKey(k)) { heroKey = k; break; } }
     html += '<div class="rkpis">';
     mkeys.slice(0, 6).forEach(k => {
-      html += '<div class="rkpi' + (k === heroKey ? " hero" : "") + '"><div class="lab" title="' + esc(prettify(k)) + '">' + esc(prettify(k)) + '</div><div class="val" data-target="' + (typeof metrics[k] === "number" ? metrics[k] : 0) + '" data-key="' + esc(k) + '">' + esc(typeof metrics[k] === "number" ? "0" : String(metrics[k])) + '</div></div>';
+      const kq = KPI_QUERIES[k] ? KPI_QUERIES[k](env.resolvedEntity) : null;
+      const ka = kq ? ' data-kpi-q="' + esc(kq) + '" title="' + esc(kq) + '" tabindex="0" role="button"' : "";
+      html += '<div class="rkpi' + (k === heroKey ? " hero" : "") + (kq ? " drillable" : "") + '"' + ka + '><div class="lab" title="' + esc(prettify(k)) + '">' + esc(prettify(k)) + '</div><div class="val" data-target="' + (typeof metrics[k] === "number" ? metrics[k] : 0) + '" data-key="' + esc(k) + '">' + esc(typeof metrics[k] === "number" ? "0" : String(metrics[k])) + '</div></div>';
     });
     html += '</div>';
   }
@@ -706,8 +811,8 @@ function renderEnvelopeCard(env) {
     const hasEnt = tbl.columns.some(c => ENTITY_COLS[String(c).toLowerCase()]);
     if (canDrill || hasEnt) {
       const hint = canDrill
-        ? (hasEnt ? "Click a row to open that job &mdash; or a highlighted name to ask about it." : "Click a row to open that job.")
-        : "Click a highlighted name to ask about it.";
+        ? (hasEnt ? "Click a row to open that job &mdash; or any underlined value to ask about it." : "Click a row to open that job, or any underlined value to ask about it.")
+        : "Click any underlined value to ask about it.";
       html += '<div class="rdrill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>' + hint + '</div>';
     }
     html += '</div>';
@@ -717,11 +822,46 @@ function renderEnvelopeCard(env) {
 
   // ---- wire interactivity (all scoped to this card) ----
   wireKpis(card);
+  wireKpiDrills(card);
   wireBars(card, charts);
   wireStatusDrills(card);
+  wireChartDrills(card);
   wireTrends(card, trends);
   if (tbl) wireTable(card, tbl);
   return card;
+}
+
+function wireKpiDrills(card) {
+  card.querySelectorAll(".rkpi[data-kpi-q]").forEach(tile => {
+    const q = tile.getAttribute("data-kpi-q");
+    tile.addEventListener("click", () => send(q));
+    tile.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); send(q); } });
+  });
+}
+
+// Non-status breakdown bars (hours by role, spend by category, …) are field
+// values too, so they drill through the same composers as a table cell.
+function wireChartDrills(card) {
+  card.querySelectorAll(".rchart").forEach(chart => {
+    const title = (chart.querySelector("h5") || {}).textContent || "";
+    const guess = /role/i.test(title) ? "role"
+                : /categor|spend/i.test(title) ? "costcategory"
+                : /payment/i.test(title) ? "paymentstatus"
+                : /task/i.test(title) ? "taskcode"
+                : null;
+    if (!guess) return;
+    chart.querySelectorAll(".bar-row:not(.drillable)").forEach(row => {
+      const label = (row.querySelector(".bl") || {}).textContent;
+      const q = label && cellQuery(guess, label, null);
+      if (!q) return;
+      row.classList.add("drillable");
+      row.setAttribute("tabindex", "0");
+      row.setAttribute("role", "button");
+      row.setAttribute("title", q);
+      row.addEventListener("click", () => send(q));
+      row.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); send(q); } });
+    });
+  });
 }
 
 function wireStatusDrills(card) {
@@ -865,17 +1005,20 @@ function wireTable(card, tbl) {
     st.cols.forEach((col, ci) => {
       const v = r[ci];
       const lc = col.toLowerCase();
+      const pid = (st.idIdx >= 0) ? r[st.idIdx] : null;
+      const cq  = cellQuery(col, v, pid);
+      const cqa = cq ? ' data-value-q="' + esc(cq) + '" title="' + esc(cq) + '" tabindex="0" role="button"' : "";
       if (lc === "status") {
         const c = statusColor(v);
-        h += '<td><span class="rpill" style="color:' + c + ';background:' + c + '26">' + esc(v) + '</span></td>';
+        h += '<td><span class="rpill' + (cq ? " cell-value" : "") + '"' + cqa + ' style="color:' + c + ';background:' + c + '26">' + esc(v) + '</span></td>';
       } else if (lc.indexOf("id") >= 0 && ci === 0) {
         h += '<td class="mono">#' + esc(v) + '</td>';
       } else if (ENTITY_COLS[lc] && v && typeof v === "string") {
         h += '<td><span class="cell-entity" data-entity-q="' + esc(entityQuery(v)) + '" title="Ask about ' + esc(v) + '">' + esc(v) + '</span></td>';
       } else if (isNumCol(col)) {
-        h += '<td class="num">' + esc(fmtCell(col, v)) + '</td>';
+        h += '<td class="num">' + (cq ? '<span class="cell-value"' + cqa + '>' + esc(fmtCell(col, v)) + '</span>' : esc(fmtCell(col, v))) + '</td>';
       } else {
-        h += '<td>' + esc(fmtCell(col, v)) + '</td>';
+        h += '<td>' + (cq ? '<span class="cell-value"' + cqa + '>' + esc(fmtCell(col, v)) + '</span>' : esc(fmtCell(col, v))) + '</td>';
       }
     });
     return h + "</tr>";
@@ -886,6 +1029,15 @@ function wireTable(card, tbl) {
     });
     tbody.querySelectorAll(".cell-entity").forEach(el => {
       el.addEventListener("click", ev => { ev.stopPropagation(); send(el.getAttribute("data-entity-q")); });
+    });
+    // every other mapped field — stopPropagation so a cell click does not also
+    // fire the row's "open this job" drill underneath it
+    tbody.querySelectorAll("[data-value-q]").forEach(el => {
+      const q = el.getAttribute("data-value-q");
+      el.addEventListener("click", ev => { ev.stopPropagation(); send(q); });
+      el.addEventListener("keydown", ev => {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); send(q); }
+      });
     });
   }
   function view() {
