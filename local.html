@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report Builder — local data source</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --card:#fff; --ink:#14171f; --muted:#606a7b; --line:#e3e7ee;
+    --brand:#2f6df6; --good:#137a4b; --warn:#9a6200; --bad:#b3261e;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#0f1218;--card:#171b23;--ink:#e8ecf3;--muted:#9aa4b5;--line:#262c38;--brand:#6c9bff}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 18px 64px}
+  h1{font-size:20px;margin:0 0 2px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+        padding:16px;margin-bottom:16px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,input,button{font:inherit;padding:8px 10px;border:1px solid var(--line);
+        border-radius:8px;background:var(--card);color:var(--ink)}
+  button{background:var(--brand);color:#fff;border-color:transparent;cursor:pointer}
+  button.ghost{background:transparent;color:var(--ink)}
+  button:hover{filter:brightness(1.06)}
+  .pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .pills button{background:transparent;color:var(--brand);border:1px solid var(--line);
+        font-size:13px;padding:5px 9px}
+  .headline{font-size:17px;font-weight:600;margin:0 0 4px}
+  .meta{color:var(--muted);font-size:12.5px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .kpi .k{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+  .kpi .v{font-size:19px;font-weight:650;margin-top:2px;font-variant-numeric:tabular-nums}
+  .sec{margin-top:18px}
+  .sec h3{font-size:14px;margin:0 0 8px;display:flex;gap:8px;align-items:baseline}
+  .sec h3 span{color:var(--muted);font-weight:400;font-size:12.5px}
+  .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{background:color-mix(in srgb,var(--card) 88%,var(--ink) 12%);position:sticky;top:0;
+     cursor:pointer;user-select:none}
+  tbody tr:last-child td{border-bottom:none}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  .note{color:var(--warn);font-size:12.5px;margin-top:8px}
+  .err{color:var(--bad)}
+  .timing{font-size:12px;color:var(--muted);margin-left:auto}
+  code{background:color-mix(in srgb,var(--card) 84%,var(--ink) 16%);padding:1px 5px;border-radius:5px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Report Builder</h1>
+  <div class="sub">
+    Data source: <code id="src">data/dataset.json</code> — computed in the browser,
+    no Power Automate round-trip.
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <select id="etype">
+        <option value="overview">overview</option>
+        <option value="client">client</option>
+        <option value="person">person</option>
+        <option value="vendor">vendor</option>
+        <option value="project">project</option>
+        <option value="segment">segment</option>
+      </select>
+      <input id="evalue" placeholder="entity (e.g. Henderson LLC, 5)" size="28">
+      <button id="go">Run</button>
+      <button id="reload" class="ghost">Reload data</button>
+      <span class="timing" id="timing"></span>
+    </div>
+    <div class="pills" id="presets"></div>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<script src="engine.browser.js"></script>
+<script>
+(function(){
+  var DATA = null, out = document.getElementById('out');
+
+  var PRESETS = [
+    ['All projects — totals',      {entityType:'overview', intent:'metric', metric:'job_count'}],
+    ['Top 5 projects by value',    {entityType:'overview', intent:'ranking',
+                                    ranking:{dimension:'contractValue', groupBy:'project', order:'desc', top:5}}],
+    ['Top managers by value',      {entityType:'overview', intent:'ranking',
+                                    ranking:{dimension:'contractValue', groupBy:'projectManager', order:'desc', top:5}}],
+    ['Spend by vendor',            {entityType:'overview', intent:'ranking',
+                                    ranking:{dimension:'spend', groupBy:'vendor', order:'desc', top:5}}],
+    ['Active jobs',                {entityType:'segment', intent:'list', filters:{status:['Active']}}],
+    ['Client: Henderson LLC',      {entityType:'client', entityValue:'Henderson LLC', intent:'profile'}],
+    ['Project #5',                 {entityType:'project', entityValue:'5', intent:'profile'}]
+  ];
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,
+    function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  function isNum(v){ return typeof v === 'number' && isFinite(v); }
+  function fmt(v){
+    if (!isNum(v)) return esc(v);
+    return Math.abs(v) >= 1000 ? v.toLocaleString(undefined,{maximumFractionDigits:2}) : String(v);
+  }
+
+  function run(req){
+    if (!DATA) { out.innerHTML = '<div class="card err">Data not loaded yet.</div>'; return; }
+    var t0 = performance.now();
+    var env = window.ReportEngine.run(DATA, req);
+    var ms = performance.now() - t0;
+    document.getElementById('timing').textContent = 'computed in ' + ms.toFixed(1) + ' ms';
+    render(env, req);
+  }
+
+  function render(env, req){
+    if (!env) { out.innerHTML = '<div class="card err">No envelope returned.</div>'; return; }
+    var h = [];
+    h.push('<div class="card">');
+    h.push('<p class="headline">' + esc((env.summary && env.summary.headline) || '(no headline)') + '</p>');
+    h.push('<div class="meta">entityType <code>' + esc(env.entityType) + '</code>'
+         + (env.resolvedEntity ? ' · ' + esc(env.resolvedEntity) : '')
+         + ' · ok ' + String(env.ok) + '</div>');
+
+    var m = (env.summary && env.summary.metrics) || {};
+    var keys = Object.keys(m);
+    if (keys.length){
+      h.push('<div class="kpis">');
+      keys.forEach(function(k){
+        h.push('<div class="kpi"><div class="k">' + esc(k) + '</div><div class="v">'
+             + fmt(m[k]) + '</div></div>');
+      });
+      h.push('</div>');
+    }
+
+    if (env.ambiguous && (env.candidates||[]).length){
+      h.push('<div class="sec"><h3>Which one?</h3><div class="pills">');
+      env.candidates.forEach(function(c){
+        h.push('<button data-cand="' + esc(c.entityValue || c.label) + '" data-ctype="'
+             + esc(c.entityType || env.entityType) + '">' + esc(c.label) + '</button>');
+      });
+      h.push('</div></div>');
+    }
+
+    (env.sections||[]).forEach(function(s, si){
+      h.push('<div class="sec"><h3>' + esc(s.title)
+           + '<span>' + (s.rowsShown||0) + ' of ' + (s.rowCount||0) + ' rows</span></h3>');
+      if ((s.rows||[]).length){
+        h.push('<div class="scroll"><table data-sec="' + si + '"><thead><tr>');
+        (s.columns||[]).forEach(function(c, ci){
+          var numeric = s.rows.every(function(r){ return isNum(r[ci]); });
+          h.push('<th class="' + (numeric?'num':'') + '" data-col="' + ci + '">' + esc(c) + '</th>');
+        });
+        h.push('</tr></thead><tbody>');
+        s.rows.forEach(function(r){
+          h.push('<tr>' + r.map(function(c){
+            return '<td class="' + (isNum(c)?'num':'') + '">' + fmt(c) + '</td>';
+          }).join('') + '</tr>');
+        });
+        h.push('</tbody></table></div>');
+      } else {
+        h.push('<div class="meta">no rows</div>');
+      }
+      h.push('</div>');
+    });
+
+    (env.notes||[]).forEach(function(n){ h.push('<div class="note">' + esc(n) + '</div>'); });
+    h.push('<details class="sec"><summary class="meta">DataRequest</summary><pre style="overflow-x:auto"><code>'
+         + esc(JSON.stringify(req, null, 2)) + '</code></pre></details>');
+    h.push('</div>');
+    out.innerHTML = h.join('');
+
+    out.querySelectorAll('[data-cand]').forEach(function(b){
+      b.addEventListener('click', function(){
+        run({entityType:b.getAttribute('data-ctype'),
+             entityValue:b.getAttribute('data-cand'), intent:'profile', filters:{}});
+      });
+    });
+    out.querySelectorAll('th[data-col]').forEach(function(th){
+      th.addEventListener('click', function(){ sortBy(th); });
+    });
+  }
+
+  function sortBy(th){
+    var table = th.closest('table'), ci = +th.getAttribute('data-col');
+    var tb = table.tBodies[0], rows = Array.prototype.slice.call(tb.rows);
+    var asc = th.dataset.asc !== 'true';
+    th.dataset.asc = asc;
+    rows.sort(function(a,b){
+      var x = a.cells[ci].textContent.replace(/[, ]/g,''),
+          y = b.cells[ci].textContent.replace(/[, ]/g,'');
+      var nx = parseFloat(x), ny = parseFloat(y);
+      if (!isNaN(nx) && !isNaN(ny)) return asc ? nx-ny : ny-nx;
+      return asc ? x.localeCompare(y) : y.localeCompare(x);
+    });
+    rows.forEach(function(r){ tb.appendChild(r); });
+  }
+
+  function load(){
+    document.getElementById('timing').textContent = 'loading data…';
+    return fetch('data/dataset.json', {cache:'no-store'})
+      .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+      .then(function(j){
+        DATA = j;
+        var n = ['ProjectsTable','HoursTable','CostsTable'].map(function(t){
+          return t.replace('Table','') + ' ' + ((j[t]&&j[t].rows||[]).length);
+        }).join(' · ');
+        document.getElementById('src').textContent = 'data/dataset.json — ' + n;
+        document.getElementById('timing').textContent = '';
+      })
+      .catch(function(e){
+        out.innerHTML = '<div class="card err">Could not load data/dataset.json: '
+                      + esc(e.message) + '</div>';
+      });
+  }
+
+  var pc = document.getElementById('presets');
+  PRESETS.forEach(function(p){
+    var b = document.createElement('button');
+    b.textContent = p[0];
+    b.addEventListener('click', function(){
+      var req = JSON.parse(JSON.stringify(p[1]));
+      if (!req.filters) req.filters = {};
+      run(req);
+    });
+    pc.appendChild(b);
+  });
+
+  document.getElementById('go').addEventListener('click', function(){
+    run({entityType: document.getElementById('etype').value,
+         entityValue: document.getElementById('evalue').value || null,
+         intent:'profile', filters:{}});
+  });
+  document.getElementById('evalue').addEventListener('keydown', function(e){
+    if (e.key === 'Enter') document.getElementById('go').click();
+  });
+  document.getElementById('reload').addEventListener('click', function(){ load(); });
+
+  load().then(function(){ if (DATA) run(PRESETS[0][1]); });
+})();
+</script>
+</body>
+</html>
